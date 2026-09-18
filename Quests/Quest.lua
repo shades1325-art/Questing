@@ -9,6 +9,14 @@ local blacklist = require "blacklist"
 local Quest = {}
 Quest.lastDebugMessage = nil
 Quest.repeatCount = 0
+
+local PRE_RAINBOW_ESCAPE_ROPE_LIMIT = 5
+local ESCAPE_ROPE_PRICE = 550
+local charmanderLine = {
+	Charmander = true,
+	Charmeleon = true,
+	Charizard = true,
+}
 -- the base class of all quests
 function Quest:new(name, description, level, dialogs)
 	local o = {}
@@ -99,14 +107,19 @@ end
 function Quest:pokemart(exitMapName)
 	local pokeballCount = getItemQuantity("Pokeball")
 	local pokeballTarget = 20
-	--local escapeRopeCount = getItemQuantity("Escape Rope")
+	local escapeRopeCount = getItemQuantity("Escape Rope")
+	local needsEscapeRopes = not hasItem("Rainbow Badge")
+		and escapeRopeCount < PRE_RAINBOW_ESCAPE_ROPE_LIMIT
+		and getMoney() >= ESCAPE_ROPE_PRICE
 
 	--pokeballs
 	-- Keep this condition aligned with the amount bought below.  The old
 	-- condition used 50 while the purchase logic stopped at 20, so after the
 	-- first purchase the quest kept the mart branch active and never reached
 	-- the exit branch.
-	if (getMoney() >= 200 and pokeballCount < pokeballTarget) then
+	if (getMoney() >= 200 and pokeballCount < pokeballTarget)
+		or needsEscapeRopes
+	then
 		--talk to shop owner - can it be they are always located at 3,5? Doesn't seem right
 
 		local specialPokemartsNPCs1 = { -- NPC: 3, 4
@@ -149,7 +162,18 @@ function Quest:pokemart(exitMapName)
 			
 			if getItemQuantity("Pokeball") < pokeballTarget and getMoney() >= 200 and pokeballToBuy > 0 then
 				if buyItem("Pokeball", pokeballToBuy) then
+					return true
 				end
+			end
+		end
+
+		if needsEscapeRopes then
+			local escapeRopesToBuy = PRE_RAINBOW_ESCAPE_ROPE_LIMIT - escapeRopeCount
+			local maximumBuyableEscapeRopes = math.floor(getMoney() / ESCAPE_ROPE_PRICE)
+			escapeRopesToBuy = math.min(escapeRopesToBuy, maximumBuyableEscapeRopes)
+			if escapeRopesToBuy > 0 then
+				sys.debug("pokemart", "Buying " .. escapeRopesToBuy .. " Escape Rope(s).")
+				return buyItem("Escape Rope", escapeRopesToBuy)
 			end
 		end
 	--if nothing to buy, leave mart
@@ -309,6 +333,12 @@ function Quest:needPokemart()
 	-- Only buy Poké Balls if we have less than 20 and enough money
 	-- This saves money early in the game
 	if getItemQuantity("Pokeball") < 20 and getMoney() >= 200 then
+		return true
+	end
+	if not hasItem("Rainbow Badge")
+		and getItemQuantity("Escape Rope") < PRE_RAINBOW_ESCAPE_ROPE_LIMIT
+		and getMoney() >= ESCAPE_ROPE_PRICE
+	then
 		return true
 	end
 	return false
@@ -661,11 +691,97 @@ end
 	--return false
 --end
 
+function Quest:getCharmanderIndex()
+	for pokemonIndex = 1, getTeamSize() do
+		if charmanderLine[getPokemonName(pokemonIndex)] then
+			return pokemonIndex
+		end
+	end
+	return nil
+end
+
+function Quest:hasActiveBattleNpc()
+	local activeBattlers = getActiveBattlers()
+	if type(activeBattlers) ~= "table" then
+		return false
+	end
+	for _ in pairs(activeBattlers) do
+		return true
+	end
+	return false
+end
+
+-- Before the Rainbow Badge, Charmander is kept out of unsafe NPC battles.
+-- A depleted Charmander is sent out of a wild battle with run(); the next
+-- path tick can then use an Escape Rope outside battle.
+function Quest:handlePreRainbowCharmanderBattleSafety()
+	if hasItem("Rainbow Badge") then
+		return false
+	end
+
+	local charmanderIndex = self:getCharmanderIndex()
+	if charmanderIndex == nil then
+		return false
+	end
+
+	local noUsablePP = not game.hasPokemonPPLeft(charmanderIndex)
+	local lowHealth = getPokemonHealthPercent(charmanderIndex) < 8
+
+	if isWildBattle() then
+		if noUsablePP then
+			sys.debug("fighting team", "Charmander has no offensive PP; running from wild battle.")
+			run()
+			return true
+		end
+		return false
+	end
+
+	if lowHealth or noUsablePP then
+		relog(0, "Relogging before NPC battle: Charmander HP/PP is unsafe.")
+		return true
+	end
+	return false
+end
+
+-- This is intentionally a path-level check. Escape Rope cannot be used as a
+-- normal out-of-battle movement action until the battle callback has ended.
+function Quest:handlePreRainbowCharmanderPathSafety()
+	if hasItem("Rainbow Badge") then
+		return false
+	end
+
+	local charmanderIndex = self:getCharmanderIndex()
+	if charmanderIndex == nil then
+		return false
+	end
+
+	local noUsablePP = not game.hasPokemonPPLeft(charmanderIndex)
+	local lowHealth = getPokemonHealthPercent(charmanderIndex) < 8
+	if not noUsablePP and not lowHealth then
+		return false
+	end
+
+	if self:hasActiveBattleNpc() then
+		relog(0, "Relogging before NPC encounter: Charmander HP/PP is unsafe.")
+		return true
+	end
+
+	if noUsablePP then
+		if getItemQuantity("Escape Rope") > 0 then
+			sys.debug("quest", "Charmander has no offensive PP; using Escape Rope.")
+			return useItem("Escape Rope")
+		end
+		sys.todo("Charmander has no offensive PP and no Escape Rope is available.")
+	end
+	return false
+end
+
 function Quest:path()
 	if self.forceRelog then
 		self.forceRelog = false
 		return relog(15, "Relogging.")
 	end
+	if self:handlePreRainbowCharmanderPathSafety() then	return true end
 	--if self:checkForDeadPokemonBug() then   return true end
 	if self:evolvePokemon() then 			return true end
 	if self:leftovers() then 				return true end
@@ -696,6 +812,36 @@ end
 
 
 function Quest:battle()
+	if self:handlePreRainbowCharmanderBattleSafety() then
+		return true
+	end
+
+	-- Before the Rainbow Badge, avoid spending Charmander's resources on
+	-- ordinary wild Ground/Water encounters. Explicit quest-capture targets
+	-- still go through the existing capture branch below.
+	if not hasItem("Rainbow Badge")
+		and isWildBattle()
+		and not (self.pokemon == getOpponentName() and self.forceCaught == false)
+		and not isOpponentShiny()
+		and getOpponentForm() == 0
+	then
+		local opponentTypes = getOpponentType()
+		local isGroundOrWater = false
+		if type(opponentTypes) == "table" then
+			for _, opponentType in ipairs(opponentTypes) do
+				local normalizedType = string.upper(tostring(opponentType))
+				if normalizedType == "GROUND" or normalizedType == "WATER" then
+					isGroundOrWater = true
+					break
+				end
+			end
+		end
+		if isGroundOrWater then
+			sys.debug("fighting team", "Running from wild Ground/Water Pokemon before Rainbow Badge.")
+			return run()
+		end
+	end
+
 	-- Once the Rainbow Badge is obtained, do not inspect the active
 	-- opponent/party state for wild encounters.  The battle callback can go
 	-- straight to the existing Lua run action instead.

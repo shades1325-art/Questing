@@ -1,5 +1,16 @@
 ﻿# Changelog
 
+## 2026-09-18 (pre-Rainbow resource safety)
+
+- Before the Rainbow Badge, run from ordinary wild Ground/Water encounters.
+- Preserve explicit quest captures and shiny/event capture handling.
+- Relog immediately before NPC encounters when Charmander-line HP is below
+  8% or it has no usable offensive PP.
+- Use an Escape Rope after Charmander-line PP exhaustion outside NPC battles.
+- Limit pre-Rainbow Escape Rope purchases to five.
+- Restore the existing post-Rainbow battle behavior and do not buy additional
+  Escape Ropes after the Rainbow Badge.
+
 ## 2026-09-18 (Viridian requests)
 
 - Added the reusable Viridian side-story quest after Viridian School.
