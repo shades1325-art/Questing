@@ -14,3 +14,11 @@
 - Lua syntax checks passed with MoonSharp.
 - Offline regression checks passed for Pokemart exit and Rainbow Badge wild-battle handling.
 - Debug and Release solution builds passed.
+
+## Repository layout
+
+- Flattened the story package so `BetterQuesting.lua` is at the repository root.
+- Moved `Libs/`, `Quests/`, `Classes/`, `Data/`, `Tests/`, and related files to the root.
+- Removed the obsolete root Pathfinder module directory.
+- Kept Lua module paths relative to the new root; story behavior is unchanged.
+
