@@ -1,0 +1,10 @@
+﻿# Runtime and local data
+Debug/
+Logs/
+Accounts/
+dataMap/
+*.log
+*.exe
+*.dll
+*.pdb
+*.zip
