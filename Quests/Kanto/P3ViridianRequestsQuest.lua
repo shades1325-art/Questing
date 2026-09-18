@@ -94,7 +94,7 @@ function P3ViridianRequestsQuest:new()
 	o.forceCaught = false
 	-- Remember the intended destination while crossing the intermediate
 	-- Viridian/Route 2 map links.  The current client no longer supports
-	-- moveToMap(), so each hop is performed with moveToCell().
+	-- map-name movement, so each hop is performed with moveToCell().
 	o.navigationTarget = nil
 
 	-- PC requirement state. This deliberately uses the existing PC globals
@@ -621,7 +621,8 @@ end
 
 -- Some Pathfinder map data exposes the lower Route 2 segment as Route 2_C;
 -- keep an explicit handler so the shared Quest dispatcher never falls back to
--- the removed moveToMap() API if that map name is reported by the client.
+-- the removed map-name movement API if that map name is reported by the
+-- client.
 function P3ViridianRequestsQuest:Route2_C()
 	if self.sentretTurnedIn then
 		return moveToCell(15, 96) -- Route 2_C -> Route 2 Stop hand-off
