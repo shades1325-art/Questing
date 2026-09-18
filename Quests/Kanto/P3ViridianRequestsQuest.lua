@@ -16,6 +16,7 @@ local RATTATA_RECTANGLE = { 22, 13, 26, 13 }
 local SENTRET_RECTANGLE = { 22, 13, 26, 13 }
 local OFFICER_JENNY_CELL = { x = 50, y = 43 }
 local JENNY_FLAG_FILE = "viridian_jenny_flags.txt"
+local JENNY_QUEST_ACCEPTED_FLAG = "viridian_requests_accepted"
 local GERRALD_FLAG = "gerrald_battle_complete"
 local RATTATA_JENNY_FLAG = "rattata_turn_in_complete"
 local SENTRET_JENNY_FLAG = "sentret_turn_in_complete"
@@ -60,12 +61,15 @@ local function hasViridianFlag(flag)
 	return false
 end
 
-local function saveViridianFlags(gerraldDefeated, rattataTurnedIn, sentretTurnedIn)
+local function saveViridianFlags(gerraldDefeated, rattataTurnedIn, sentretTurnedIn, jennyQuestAccepted)
 	if type(logToFile) ~= "function" then
 		return false
 	end
 
 	local flags = {}
+	if jennyQuestAccepted then
+		table.insert(flags, JENNY_QUEST_ACCEPTED_FLAG)
+	end
 	if gerraldDefeated then
 		table.insert(flags, GERRALD_FLAG)
 	end
@@ -90,6 +94,11 @@ function P3ViridianRequestsQuest:new()
 	o.gerraldWarningShown = false
 	o.rattataTurnedIn = hasViridianFlag(RATTATA_JENNY_FLAG)
 	o.sentretTurnedIn = hasViridianFlag(SENTRET_JENNY_FLAG)
+	-- Older flag files predate the Jenny quest pickup.  A completed turn-in
+	-- already proves that the request was accepted, so preserve that progress.
+	o.jennyQuestAccepted = hasViridianFlag(JENNY_QUEST_ACCEPTED_FLAG)
+		or o.rattataTurnedIn
+		or o.sentretTurnedIn
 	o.pokemon = nil
 	o.forceCaught = false
 	-- Remember the intended destination while crossing the intermediate
@@ -118,7 +127,7 @@ end
 function P3ViridianRequestsQuest:markGerraldDefeated()
 	self.gerraldDefeated = true
 	self.gerraldBattlePending = false
-	saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
+	saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn, self.jennyQuestAccepted)
 end
 
 function P3ViridianRequestsQuest:isDoable()
@@ -189,6 +198,11 @@ end
 -- hook only gives Gerrald the confirmed coordinates and pending-battle flag;
 -- it does not add a second trainer-battle state machine.
 function P3ViridianRequestsQuest:fightTrainersOnMap()
+	-- Officer Jenny must issue the request before Gerrald can be battled;
+	-- this also prevents the shared trainer scan from bypassing the pickup.
+	if not self.jennyQuestAccepted then
+		return false
+	end
 	local x, y = self:findActiveGerraldCell()
 	if x ~= nil and isNpcOnCell(x, y) then
 		return self:talkToGerrald(x, y)
@@ -197,6 +211,11 @@ function P3ViridianRequestsQuest:fightTrainersOnMap()
 end
 
 function P3ViridianRequestsQuest:ViridianForest()
+	if not self.jennyQuestAccepted then
+		self.navigationTarget = "questPickup"
+		return moveToCell(40, 70) -- Viridian Forest -> Route 2 Stop
+	end
+
 	if self.gerraldDefeated then
 		sys.debug("Viridian requests", "Gerrald defeated; going to Route 1.")
 		self.navigationTarget = "route1"
@@ -477,17 +496,26 @@ function P3ViridianRequestsQuest:talkToOfficerJenny(turnIn)
 
 	local action = talkToNpcOnCell(OFFICER_JENNY_CELL.x, OFFICER_JENNY_CELL.y)
 	if action then
-		if turnIn == "rattata" then
+		if turnIn == "accept" then
+			self.jennyQuestAccepted = true
+			self.navigationTarget = "forest"
+			sys.debug("Viridian requests", "Officer Jenny quest accepted; Rattata Hair drops enabled.")
+		elseif turnIn == "rattata" then
 			self.rattataTurnedIn = true
 		elseif turnIn == "sentret" then
 			self.sentretTurnedIn = true
 		end
-		saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
+		saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn, self.jennyQuestAccepted)
 	end
 	return action
 end
 
 function P3ViridianRequestsQuest:Route1()
+	if not self.jennyQuestAccepted then
+		self.navigationTarget = "jenny"
+		return self:talkToOfficerJenny("accept")
+	end
+
 	if self.sentretTurnedIn then
 		self.pokemon = nil
 		self.navigationTarget = "route2"
@@ -582,8 +610,16 @@ function P3ViridianRequestsQuest:ViridianCity()
 		self.navigationTarget = "pokecenter"
 		return moveToCell(44, 43) -- Viridian City -> Pokecenter Viridian
 	end
+	if not self.jennyQuestAccepted then
+		self.navigationTarget = "jenny"
+		return moveToCell(48, 61) -- Viridian City -> Route 1 Stop House
+	end
 	if self.sentretTurnedIn or self.navigationTarget == "route2" then
 		self.navigationTarget = "route2"
+		return moveToCell(37, 0) -- Viridian City -> Route 2_C/Route 2
+	end
+	if not self.gerraldDefeated then
+		self.navigationTarget = "forest"
 		return moveToCell(37, 0) -- Viridian City -> Route 2_C/Route 2
 	end
 	self.navigationTarget = "route1"
@@ -591,7 +627,10 @@ function P3ViridianRequestsQuest:ViridianCity()
 end
 
 function P3ViridianRequestsQuest:Route1StopHouse()
-	if self.navigationTarget == "route2" or self.navigationTarget == "pokecenter" then
+	if self.navigationTarget == "route2"
+		or self.navigationTarget == "pokecenter"
+		or self.navigationTarget == "forest"
+	then
 		return moveToCell(3, 2) -- Route 1 Stop House -> Viridian City
 	end
 	return moveToCell(3, 12) -- Route 1 Stop House -> Route 1
@@ -600,6 +639,10 @@ end
 function P3ViridianRequestsQuest:Route2()
 	if self.sentretTurnedIn then
 		return false
+	end
+	if not self.jennyQuestAccepted then
+		self.navigationTarget = "questPickup"
+		return moveToCell(10, 130) -- Route 2_C/Route 2 -> Viridian City
 	end
 	if self.navigationTarget == "route1" or self.gerraldDefeated then
 		self.navigationTarget = "route1"
@@ -613,7 +656,7 @@ function P3ViridianRequestsQuest:Route2Stop()
 	if self.sentretTurnedIn then
 		return false
 	end
-	if self.navigationTarget == "route1" then
+	if self.navigationTarget == "route1" or self.navigationTarget == "questPickup" then
 		return moveToCell(3, 12) -- Route 2 Stop -> Route 2_C
 	end
 	return moveToCell(4, 2) -- Route 2 Stop -> Viridian Forest
@@ -624,10 +667,13 @@ end
 -- the removed map-name movement API if that map name is reported by the
 -- client.
 function P3ViridianRequestsQuest:Route2_C()
+	if not self.jennyQuestAccepted or self.navigationTarget == "questPickup" then
+		return moveToCell(10, 130) -- Route 2_C -> Viridian City
+	end
 	if self.sentretTurnedIn then
 		return moveToCell(15, 96) -- Route 2_C -> Route 2 Stop hand-off
 	end
-	if self.navigationTarget == "route1" then
+	if self.navigationTarget == "route1" or self.gerraldDefeated then
 		return moveToCell(10, 130) -- Route 2_C -> Viridian City
 	end
 	return moveToCell(15, 96) -- Route 2_C -> Route 2 Stop

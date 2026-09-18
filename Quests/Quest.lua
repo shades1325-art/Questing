@@ -30,6 +30,7 @@ function Quest:new(name, description, level, dialogs)
 	o.canRun	  = true
 	o.canSwitch   = true 
 	o.blockedMove = false
+	o.npcInteractionsDisableRequested = false
 	return o
 end
 
@@ -654,11 +655,17 @@ function Quest:checkNPCInteractions()
 	-- NPC interactions again on the next path-action frame.
 	if hasItem("Rainbow Badge") then
 		if isNpcInteractionsEnabled() then
-			sys.debug("NPC INTERACTIONS", "disabled after Rainbow Badge.")
-			return disableNpcInteractions()
+			if not self.npcInteractionsDisableRequested then
+				self.npcInteractionsDisableRequested = true
+				sys.debug("NPC INTERACTIONS", "disabled after Rainbow Badge.")
+				return disableNpcInteractions()
+			end
+			return false
 		end
+		self.npcInteractionsDisableRequested = false
 		return false
 	end
+	self.npcInteractionsDisableRequested = false
 
 	local mapBlacklistForNPCInteractions = {
 		"Underground Warehouse",

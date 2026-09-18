@@ -5,6 +5,35 @@
 
 local QuestManager = {}
 
+local COMPLETED_QUESTS_FILE = "quest_completed_flags.txt"
+local COMPLETED_QUEST_PREFIX = "completed:"
+
+local function loadCompletedQuestFlags()
+	local flags = {}
+	if type(readLinesFromFile) ~= "function" then
+		return flags
+	end
+
+	local lines = readLinesFromFile(COMPLETED_QUESTS_FILE)
+	if type(lines) ~= "table" then
+		return flags
+	end
+
+	for _, line in ipairs(lines) do
+		if type(line) == "string" and line ~= "" then
+			flags[line] = true
+		end
+	end
+	return flags
+end
+
+local function completedQuestKey(quest)
+	if quest == nil or type(quest.name) ~= "string" then
+		return nil
+	end
+	return COMPLETED_QUEST_PREFIX .. quest.name
+end
+
 --Kanto
 local P1StartKantoQuest				= require('Quests/Kanto/P1StartKantoQuest')
 local P2PalletStartQuest			= require('Quests/Kanto/P2PalletStartQuest')
@@ -174,7 +203,35 @@ function QuestManager:new(o)
 	o.selected = nil
 	o.isOver = false
 	o.lastRelog = os.time()
+	o.completedQuestFlags = loadCompletedQuestFlags()
 	return o
+end
+
+function QuestManager:isQuestPersistentlyCompleted(quest)
+	local key = completedQuestKey(quest)
+	return key ~= nil and self.completedQuestFlags[key] == true
+end
+
+function QuestManager:markQuestCompleted(quest)
+	local key = completedQuestKey(quest)
+	if key == nil or self.completedQuestFlags[key] then
+		return false
+	end
+
+	self.completedQuestFlags[key] = true
+	if type(logToFile) ~= "function" then
+		return true
+	end
+
+	local flags = {}
+	for flag, completed in pairs(self.completedQuestFlags) do
+		if completed then
+			table.insert(flags, flag)
+		end
+	end
+	table.sort(flags)
+	logToFile(COMPLETED_QUESTS_FILE, flags, true)
+	return true
 end
 
 function QuestManager:message()
@@ -191,8 +248,12 @@ function QuestManager:pause()
 end
 
 function QuestManager:next()
+	local previousQuest = self.selected
 	for _, quest in pairs(self.quests) do
-		if quest:isDoable() == true then
+		if quest ~= previousQuest
+			and not self:isQuestPersistentlyCompleted(quest)
+			and quest:isDoable() == true
+		then
 			self.selected = quest
 			return quest
 		end
@@ -202,7 +263,11 @@ function QuestManager:next()
 end
 
 function QuestManager:isQuestOver()
-	if not self.selected or self.selected:isDone() then
+	if not self.selected then
+		return true
+	end
+	if self.selected:isDone() then
+		self:markQuestCompleted(self.selected)
 		return true
 	end
 	return false

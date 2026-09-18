@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-19 (Officer Jenny quest pickup)
+
+- Require the Viridian requests quest to be accepted from Officer Jenny after
+  the Viridian School hand-off before Gerrald is battled or Rattata is hunted.
+- Persist the acceptance flag so the server-side Rattata Hair drop behavior
+  remains enabled across script restarts.
+
+## 2026-09-19 (persistent quest completion flags)
+
+- QuestManager now records completed quest names in
+  `quest_completed_flags.txt` and skips only quests whose `isDone()` state was
+  observed, avoiding repeated checks after a restart.
+- Throttled the post-Rainbow NPC interaction disable request so a delayed
+  client state update does not repeat the debug message every tick.
+
 ## 2026-09-19 (Viridian movement API fix)
 
 - Replaced the Viridian requests quest's obsolete moveToMap actions with
