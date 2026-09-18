@@ -128,7 +128,11 @@ end
 -- The next Boulder Badge quest expects to start from Route 2. We therefore
 -- finish this quest after the final Jenny turn-in and the return to Route 2.
 function P3ViridianRequestsQuest:isDone()
-	return self.sentretTurnedIn and getMapName() == "Route 2"
+	local mapName = getMapName()
+	-- The external Pathfinder data can expose the hand-off as Route 2 Stop,
+	-- while the live client may report the combined map as Route 2.
+	return self.sentretTurnedIn
+		and (mapName == "Route 2" or mapName == "Route 2 Stop")
 end
 
 function P3ViridianRequestsQuest:getRattataHairCount()
@@ -606,6 +610,9 @@ function P3ViridianRequestsQuest:Route2()
 end
 
 function P3ViridianRequestsQuest:Route2Stop()
+	if self.sentretTurnedIn then
+		return false
+	end
 	if self.navigationTarget == "route1" then
 		return moveToCell(3, 12) -- Route 2 Stop -> Route 2_C
 	end
@@ -616,6 +623,9 @@ end
 -- keep an explicit handler so the shared Quest dispatcher never falls back to
 -- the removed moveToMap() API if that map name is reported by the client.
 function P3ViridianRequestsQuest:Route2_C()
+	if self.sentretTurnedIn then
+		return moveToCell(15, 96) -- Route 2_C -> Route 2 Stop hand-off
+	end
 	if self.navigationTarget == "route1" then
 		return moveToCell(10, 130) -- Route 2_C -> Viridian City
 	end
