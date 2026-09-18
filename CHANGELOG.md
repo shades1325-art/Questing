@@ -1,5 +1,15 @@
 ﻿# Changelog
 
+## 2026-09-19 (Viridian side-story integration)
+
+- Registered the Viridian Gerrald/Rattata/Sentret quest before Boulder Badge
+  progression.
+- Configured Bug Catcher Gerrald at `(61, 13)`.
+- Persisted Gerrald and Officer Jenny progress through the existing
+  `readLinesFromFile` and `logToFile` APIs.
+- Added Route 2 recovery so the Viridian School quest can hand off cleanly to
+  the Viridian Forest quest.
+
 ## 2026-09-18 (Viridian school order)
 
 - Route the Viridian School quest to the school before the Viridian Maze and

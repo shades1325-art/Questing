@@ -187,6 +187,17 @@ function P3ViridianSchoolQuest:ViridianCitySchoolUnderground()
 	end	
 end
 
+-- The route from Viridian City can arrive on Route 2 directly.  Keep a
+-- handler here so the shared Quest:path() dispatcher can finish this quest
+-- and let the next quest take over toward Viridian Forest.
+function P3ViridianSchoolQuest:Route2()
+	if not self.checkedViridianMaze then
+		self.checkedViridianMaze = true
+		sys.debug("quest", "Route 2 reached after Viridian School; continuing.")
+	end
+	return true
+end
+
 function P3ViridianSchoolQuest:Route22()
 	if self:needPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")

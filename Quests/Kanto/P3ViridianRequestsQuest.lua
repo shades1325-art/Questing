@@ -15,6 +15,10 @@ local RATTATA_HAIR = "Rattata Hair"
 local RATTATA_RECTANGLE = { 22, 13, 26, 13 }
 local SENTRET_RECTANGLE = { 22, 13, 26, 13 }
 local OFFICER_JENNY_CELL = { x = 50, y = 43 }
+local JENNY_FLAG_FILE = "viridian_jenny_flags.txt"
+local GERRALD_FLAG = "gerrald_battle_complete"
+local RATTATA_JENNY_FLAG = "rattata_turn_in_complete"
+local SENTRET_JENNY_FLAG = "sentret_turn_in_complete"
 
 -- The cell is intentionally configurable until it is confirmed in-game.
 -- The active-battler lookup below still handles the normal trainer case.
@@ -35,15 +39,57 @@ local function containsIgnoreCase(value, fragment)
 	return string.find(string.lower(value), string.lower(fragment), 1, true) ~= nil
 end
 
+-- Persist Viridian side-story progress through the existing script file APIs.
+-- logToFile/readLinesFromFile are restricted by PROBot to the Logs folder;
+-- keeping the filename constant makes progress survive a script restart.
+local function hasViridianFlag(flag)
+	if type(readLinesFromFile) ~= "function" then
+		return false
+	end
+
+	local lines = readLinesFromFile(JENNY_FLAG_FILE)
+	if type(lines) ~= "table" then
+		return false
+	end
+
+	for _, line in ipairs(lines) do
+		if line == flag then
+			return true
+		end
+	end
+	return false
+end
+
+local function saveViridianFlags(gerraldDefeated, rattataTurnedIn, sentretTurnedIn)
+	if type(logToFile) ~= "function" then
+		return false
+	end
+
+	local flags = {}
+	if gerraldDefeated then
+		table.insert(flags, GERRALD_FLAG)
+	end
+	if rattataTurnedIn then
+		table.insert(flags, RATTATA_JENNY_FLAG)
+	end
+	if sentretTurnedIn then
+		table.insert(flags, SENTRET_JENNY_FLAG)
+	end
+
+	-- Overwrite instead of appending so repeated ticks never duplicate flags.
+	logToFile(JENNY_FLAG_FILE, flags, true)
+	return true
+end
+
 function P3ViridianRequestsQuest:new()
 	local o = Quest.new(P3ViridianRequestsQuest, name, description, 1)
-	o.gerraldDefeated = false
+	o.gerraldDefeated = hasViridianFlag(GERRALD_FLAG)
 	o.gerraldApproached = false
 	o.gerraldBattlePending = false
 	o.gerraldSearchAttempts = 0
 	o.gerraldWarningShown = false
-	o.rattataTurnedIn = false
-	o.sentretTurnedIn = false
+	o.rattataTurnedIn = hasViridianFlag(RATTATA_JENNY_FLAG)
+	o.sentretTurnedIn = hasViridianFlag(SENTRET_JENNY_FLAG)
 	o.pokemon = nil
 	o.forceCaught = false
 
@@ -158,6 +204,7 @@ function P3ViridianRequestsQuest:ViridianForest()
 	-- handler, the requested battle has completed.
 	if self.gerraldApproached then
 		self.gerraldDefeated = true
+		saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
 		return moveToMap("Route 1")
 	end
 
@@ -419,6 +466,7 @@ function P3ViridianRequestsQuest:talkToOfficerJenny(turnIn)
 		elseif turnIn == "sentret" then
 			self.sentretTurnedIn = true
 		end
+		saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
 	end
 	return action
 end
@@ -535,6 +583,7 @@ function P3ViridianRequestsQuest:battleMessage(message)
 		if self.gerraldBattlePending or activeX == nil then
 			self.gerraldDefeated = true
 			self.gerraldBattlePending = false
+			saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
 		end
 	end
 
