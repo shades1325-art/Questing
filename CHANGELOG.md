@@ -1,5 +1,18 @@
 ﻿# Changelog
 
+## 2026-09-19 (rod purchases disabled)
+
+- Disabled automatic purchases of the Good Rod and Super Rod by setting
+  BUY_RODS = false.
+
+## 2026-09-19 (Gerrald completion handling)
+
+- Mark Gerrald complete immediately after the actual battle-win message.
+- Recognize Gerrald's post-battle “come back later” dialogue when the NPC
+  remains visible, preventing the quest from attempting the battle again.
+- Leave the completion flag unset when the battle is interrupted before it is
+  won, allowing the story segment to resume safely after reconnecting.
+
 ## 2026-09-19 (Viridian side-story integration)
 
 - Registered the Viridian Gerrald/Rattata/Sentret quest before Boulder Badge

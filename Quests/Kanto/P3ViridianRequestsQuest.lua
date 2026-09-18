@@ -111,6 +111,12 @@ function P3ViridianRequestsQuest:new()
 	return o
 end
 
+function P3ViridianRequestsQuest:markGerraldDefeated()
+	self.gerraldDefeated = true
+	self.gerraldBattlePending = false
+	saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
+end
+
 function P3ViridianRequestsQuest:isDoable()
 	return not hasItem("Boulder Badge") and self:hasMap()
 end
@@ -171,13 +177,13 @@ function P3ViridianRequestsQuest:talkToGerrald(x, y)
 	return talkToNpcOnCell(x, y)
 end
 
--- The shared Quest implementation still owns trainer interaction. This
--- small hook only records that Gerrald was present before delegating to it;
+-- The shared Quest implementation still owns other trainer interaction. This
+-- hook only gives Gerrald the confirmed coordinates and pending-battle flag;
 -- it does not add a second trainer-battle state machine.
 function P3ViridianRequestsQuest:fightTrainersOnMap()
-	local x = self:findActiveGerraldCell()
-	if x ~= nil then
-		self.gerraldApproached = true
+	local x, y = self:findActiveGerraldCell()
+	if x ~= nil and isNpcOnCell(x, y) then
+		return self:talkToGerrald(x, y)
 	end
 	return Quest.fightTrainersOnMap(self)
 end
@@ -203,8 +209,7 @@ function P3ViridianRequestsQuest:ViridianForest()
 	-- Once the active battler disappears after the common trainer-battle
 	-- handler, the requested battle has completed.
 	if self.gerraldApproached then
-		self.gerraldDefeated = true
-		saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
+		self:markGerraldDefeated()
 		return moveToMap("Route 1")
 	end
 
@@ -576,15 +581,25 @@ function P3ViridianRequestsQuest:Route2()
 	return moveToMap("Viridian Forest")
 end
 
+function P3ViridianRequestsQuest:dialog(message)
+	-- Gerrald remains visible after his one-time battle and answers with this
+	-- message on later interaction. Treat it as the completed story segment so
+	-- the quest does not try to battle him again after a restart/interruption.
+	if self.gerraldApproached
+		and containsIgnoreCase(message, "haven't found anything else unique to battle you with")
+	then
+		self:markGerraldDefeated()
+		return true
+	end
+	return Quest.dialog(self, message)
+end
+
 function P3ViridianRequestsQuest:battleMessage(message)
 	Quest.battleMessage(self, message)
-	if self.gerraldApproached and containsIgnoreCase(message, "won the battle") then
-		local activeX = self:findActiveGerraldCell()
-		if self.gerraldBattlePending or activeX == nil then
-			self.gerraldDefeated = true
-			self.gerraldBattlePending = false
-			saveViridianFlags(self.gerraldDefeated, self.rattataTurnedIn, self.sentretTurnedIn)
-		end
+	if self.gerraldBattlePending and containsIgnoreCase(message, "won the battle") then
+		-- Do not wait for Gerrald to disappear from getActiveBattlers(); the
+		-- server keeps the NPC visible and only changes his dialogue.
+		self:markGerraldDefeated()
 	end
 
 	if containsIgnoreCase(message, "caught") then

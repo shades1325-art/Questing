@@ -1,7 +1,7 @@
 -- ------Quest related options------
 --general
 BUY_BIKE = true                 -- true: buy bike, false: buy not
-BUY_RODS = true                 -- true: buy rods, false: buy not
+BUY_RODS = false                -- true: buy rods, false: do not buy Good/Super Rod
 
 --regional - kanto
 KANTO_STARTER_ID = 2          -- nil: random, 1: Bulbasaur, 2: Charmander, 3: Squirtle, 4: Pikachu
