@@ -2,11 +2,11 @@
 
 ## 2026-09-19 (Boulder training heal loop)
 
-- Make the Pewter City step honor the quest's HP/PP healing check before
-  sending the team back to Route 2, preventing the Pewter/Route 2 loop when
-  the lead Pokémon has no usable PP.
-- Use the same full HP/PP condition inside the quest's healing helper so a
-  fully healed team is not sent back to the Pokecenter repeatedly.
+- Make the Pewter City step honor the quest's recovery check before sending
+  the team back to Route 2, preventing the loop when no usable PP remains.
+- Keep training after partial PP consumption and heal only when the whole
+  party has no usable offensive Pokémon left, avoiding both route and
+  Pokecenter loops.
 
 ## 2026-09-19 (account-specific quest flags)
 

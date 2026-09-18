@@ -139,11 +139,15 @@ function P4BoulderBadgeQuest:route2Up()
 end
 
 function P4BoulderBadgeQuest:needPokecenter()
-	-- Keep the training and Pokecenter decisions consistent.  The shared
-	-- needPokecenter() helper also considers level-cap usability, which can
-	-- remain false after healing and cause a Pewter/PC loop.  Full HP and PP
-	-- are the actual recovery conditions for this early Kanto quest.
-	return not game.isTeamFullyHealed()
+	-- Missing some PP is normal during training.  Heal only when no living
+	-- party member still has a usable offensive move; otherwise one battle
+	-- would send the team back to Pewter after every encounter.
+	for pokemonId = 1, getTeamSize() do
+		if isPokemonUsable(pokemonId) then
+			return false
+		end
+	end
+	return true
 end
 
 function P4BoulderBadgeQuest:PewterCity()
