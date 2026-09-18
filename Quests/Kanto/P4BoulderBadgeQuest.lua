@@ -173,6 +173,7 @@ function P4BoulderBadgeQuest:PewterCity()
 		return moveToCell(65, 34)
 	elseif self.registeredPokecenter ~= "Pokecenter Pewter"
 		or not game.isTeamFullyHealed()
+		or self:needPokecenter()
 	then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(24, 35)

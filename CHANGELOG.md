@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-19 (Boulder training heal loop)
+
+- Make the Pewter City step honor the quest's HP/PP healing check before
+  sending the team back to Route 2, preventing the Pewter/Route 2 loop when
+  the lead Pokémon has no usable PP.
+
 ## 2026-09-19 (account-specific quest flags)
 
 - Quest completion flags now use `getAccountName()` and are stored separately
