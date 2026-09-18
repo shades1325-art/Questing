@@ -98,14 +98,17 @@ function P3ViridianSchoolQuest:ViridianCity()
 		sys.debug("quest", "Going to buy Pokeballs")
 		return moveToCell(54, 34)
 
-	-- Check if we need to get Dragon Rage from Viridian Maze
+	-- Visit the school before leaving Viridian City for the northern route.
+	-- The previous order sent the quest to Viridian Maze first, which could
+	-- leave the player at Route 1/Route 2 without completing the school step.
+	elseif not self.dialogs.jacksonDefeated.state and self:isTrainingOver() then
+		sys.debug("quest", "Going to Viridian City School before Viridian Forest")
+		return moveToCell(48, 34)
+
+	-- Check if we need to get Dragon Rage from Viridian Maze after school.
 	elseif not self.checkedViridianMaze and self:isTrainingOver() then
 		sys.debug("quest", "Going to Viridian Maze for Dragon Rage")
 		return moveToCell(39, 0)
-
-	elseif not self.dialogs.jacksonDefeated.state and self:isTrainingOver() then
-		sys.debug("quest", "Going to fight Jackson")
-		return moveToCell(48, 34)
 
 	elseif not self.forceCaught and getTeamSize() < 3 then
 		-- Only force catch Poliwag if we have less than 3 Pokémon

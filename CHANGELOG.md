@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 2026-09-18 (Viridian school order)
+
+- Route the Viridian School quest to the school before the Viridian Maze and
+  northern Route 2/Viridian Forest progression.
+
 ## 2026-09-18 (pre-Rainbow resource safety)
 
 - Before the Rainbow Badge, run from ordinary wild Ground/Water encounters.
