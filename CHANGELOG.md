@@ -1,9 +1,21 @@
 # Changelog
 
+## 2026-09-19 (Charmander hero progression)
+
+- Use only Charmander, Charmeleon, or Charizard for battle and level-cap
+  training before the Rainbow Badge.
+- Send the hero to a Pokecenter when its HP is below 8% or it has no usable
+  offensive PP; wild battles run away and NPC battles relog instead of using
+  another party member.
+- Run immediately from wild Ground/Water encounters before the Rainbow Badge.
+- Move Mt. Moon 1F training to Route 3 at the configured Route 3 rectangle.
+
 ## 2026-09-19 (Boulder training heal loop)
 
 - Make the Pewter City step honor the quest's recovery check before sending
   the team back to Route 2, preventing the loop when no usable PP remains.
+- Return to the Pokecenter immediately when the lead starter is knocked out,
+  even if another party member can still battle.
 - Keep training after partial PP consumption and heal only when the whole
   party has no usable offensive Pokémon left, avoiding both route and
   Pokecenter loops.

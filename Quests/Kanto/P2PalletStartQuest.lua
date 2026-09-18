@@ -150,6 +150,10 @@ function P2PalletStartQuest:OaksLab()
 end
 
 function P2PalletStartQuest:battle()
+	if self:isHeroOnlyMode() then
+		return self:battleHeroOnly()
+	end
+
 	--if getPokemonHealthPercent(1) < 50 then
 		--if useItemOnPokemon("Potion", 1) then
 			--return true

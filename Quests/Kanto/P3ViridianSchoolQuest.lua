@@ -80,6 +80,11 @@ function P3ViridianSchoolQuest:Route1StopHouse()
 end
 
 function P3ViridianSchoolQuest:isTrainingOver()
+	local heroTrainingIsOver = self:heroTrainingOver()
+	if heroTrainingIsOver ~= nil then
+		return heroTrainingIsOver
+	end
+
 	-- More flexible training: at least one Pokémon at level 11 is enough
 	-- This makes the quest faster
 	if team.getHighestLvl() >= self.level then
@@ -89,7 +94,7 @@ function P3ViridianSchoolQuest:isTrainingOver()
 end
 
 function P3ViridianSchoolQuest:ViridianCity()
-	if not game.isTeamFullyHealed()
+	if self:needsTeamHealingForStory()
 		or self.registeredPokecenter ~= "Pokecenter Viridian" then
 		sys.debug("quest", "Going to heal Pokemon")
 		return moveToCell(44, 43)
@@ -125,36 +130,12 @@ function P3ViridianSchoolQuest:ViridianCity()
 	end
 end
 
-function P3ViridianSchoolQuest:needPokecenter()
-	local lead = 1
-
-	-- More efficient healing: only heal when really needed to save time
-	if getPokemonHealthPercent(lead) < 20 then
-		return true
-	end
-
-	local hasPP = false
-	for i = 1, 4 do
-		local moveName = getPokemonMoveName(lead, i)
-		if moveName and getRemainingPowerPoints(lead, moveName) > 2 then
-			hasPP = true
-			break
-		end
-	end
-
-	if not hasPP then
-		return true
-	end
-
-	return Quest.needPokecenter(self)
-end
-
-
 function P3ViridianSchoolQuest:PokecenterViridian()
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(9, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Viridian"
 		return moveToCell(9, 22)
 	end

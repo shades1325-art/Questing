@@ -31,6 +31,7 @@ function Quest:new(name, description, level, dialogs)
 	o.canSwitch   = true 
 	o.blockedMove = false
 	o.npcInteractionsDisableRequested = false
+	o.heroHealRequested = false
 	return o
 end
 
@@ -76,6 +77,93 @@ function Quest:hasMap()
 	return false
 end
 
+function Quest:getHeroPokemonIndex()
+	return self:getCharmanderIndex()
+end
+
+function Quest:isHeroOnlyMode()
+	return not hasItem("Rainbow Badge") and self:getHeroPokemonIndex() ~= nil
+end
+
+-- Before Rainbow Badge, only the Charmander line controls battles and
+-- healing decisions. Other party members are deliberately ignored.
+function Quest:heroNeedsHealing()
+	local heroPokemonId = self:getHeroPokemonIndex()
+	if heroPokemonId == nil then
+		return false
+	end
+
+	return getPokemonHealth(heroPokemonId) <= 0
+		or getPokemonHealthPercent(heroPokemonId) < 8
+		or not isPokemonUsable(heroPokemonId)
+end
+
+function Quest:isGroundOrWaterWildBattle()
+	if not isWildBattle() then
+		return false
+	end
+
+	local opponentTypes = getOpponentType()
+	if type(opponentTypes) ~= "table" then
+		return false
+	end
+
+	for _, opponentType in ipairs(opponentTypes) do
+		local normalizedType = string.lower(tostring(opponentType))
+		if normalizedType == "ground" or normalizedType == "water" then
+			return true
+		end
+	end
+	return false
+end
+
+function Quest:shouldHealAtPokecenter()
+	if self:isHeroOnlyMode() then
+		local heroPokemonId = self:getHeroPokemonIndex()
+		if heroPokemonId == nil then
+			return false
+		end
+
+		if self:heroNeedsHealing() then
+			return true
+		end
+
+		return self.heroHealRequested
+			and (getPokemonHealthPercent(heroPokemonId) < 100
+				or not game.isPokemonFullPP(heroPokemonId))
+	end
+
+	return not game.isTeamFullyHealed()
+end
+
+-- Map scripts that previously required the whole team to be healed use this
+-- boundary so a damaged non-hero member cannot send the story backwards.
+function Quest:needsTeamHealingForStory()
+	if self:isHeroOnlyMode() then
+		return false
+	end
+	return not game.isTeamFullyHealed()
+end
+
+function Quest:heroTrainingOver()
+	if not self:isHeroOnlyMode() then
+		return nil
+	end
+
+	local heroPokemonId = self:getHeroPokemonIndex()
+	if heroPokemonId == nil then
+		return nil
+	end
+
+	if getPokemonLevel(heroPokemonId) >= self.level then
+		if self.training then
+			self:stopTraining()
+		end
+		return true
+	end
+	return false
+end
+
 function Quest:pokecenter(exitMapName) -- idealy make it work without exitMapName
 
 	local JohtoPokecenters = { -- moveToCell(10, 20) ?
@@ -90,15 +178,17 @@ function Quest:pokecenter(exitMapName) -- idealy make it work without exitMapNam
 
 
 	self.registeredPokecenter = getMapName()		
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		if getMapName() == "Indigo Plateau Center" or getMapName() == "Indigo Plateau Center Johto" then
 			return talkToNpcOnCell(4, 22)
 		else
 			return usePokecenter()
 		end
 	elseif sys.tableHasValue(JohtoPokecenters, getMapName()) then
+		self.heroHealRequested = false
 		return moveToCell(10, 20)
 	else
+		self.heroHealRequested = false
 		return moveToCell(9,22)
 	end
 end
@@ -216,6 +306,11 @@ end
 
 
 function Quest:isTrainingOver()
+	local heroTrainingIsOver = self:heroTrainingOver()
+	if heroTrainingIsOver ~= nil then
+		return heroTrainingIsOver
+	end
+
 	local lowestLvl = team.getLowestLvl()
 	if lowestLvl and lowestLvl >= self.level then
 		if self.training then -- end the training
@@ -346,6 +441,14 @@ function Quest:needPokemart()
 end
 
 function Quest:needPokecenter()
+	if self:isHeroOnlyMode() then
+		local heroNeedsHealing = self:heroNeedsHealing()
+		if heroNeedsHealing then
+			self.heroHealRequested = true
+		end
+		return heroNeedsHealing
+	end
+
 	if getUsablePokemonCount() < getTeamSize() then
 		return true
 	end
@@ -718,6 +821,43 @@ function Quest:hasActiveBattleNpc()
 	return false
 end
 
+function Quest:battleHeroOnly()
+	local heroPokemonId = self:getHeroPokemonIndex()
+	if heroPokemonId == nil then
+		return false
+	end
+
+	if self:isGroundOrWaterWildBattle() then
+		return run()
+	end
+
+	if self:heroNeedsHealing() then
+		self.heroHealRequested = true
+		if isWildBattle() then
+			return run()
+		end
+		return relog(0, "Relogging before NPC battle: hero HP/PP is unsafe.")
+	end
+
+	if getActivePokemonNumber() ~= heroPokemonId then
+		if self.canSwitch and sendPokemon(heroPokemonId) then
+			return true
+		end
+		if isWildBattle() then
+			return run()
+		end
+		return relog(0, "Relogging: unable to send hero Pokemon.")
+	end
+
+	if attack() or useAnyMove() then
+		return true
+	end
+	if isWildBattle() then
+		return run()
+	end
+	return relog(0, "Relogging: no usable hero battle action.")
+end
+
 -- Before the Rainbow Badge, Charmander is kept out of unsafe NPC battles.
 -- A depleted Charmander is sent out of a wild battle with run(); the next
 -- path tick can then use an Escape Rope outside battle.
@@ -731,19 +871,24 @@ function Quest:handlePreRainbowCharmanderBattleSafety()
 		return false
 	end
 
-	local noUsablePP = not game.hasPokemonPPLeft(charmanderIndex)
+	local noUsablePP = not isPokemonUsable(charmanderIndex)
 	local lowHealth = getPokemonHealthPercent(charmanderIndex) < 8
 
 	if isWildBattle() then
-		if noUsablePP then
-			sys.debug("fighting team", "Charmander has no offensive PP; running from wild battle.")
-			run()
-			return true
+		if lowHealth or noUsablePP then
+			self.heroHealRequested = true
+			sys.debug("fighting team", "Hero HP/PP is unsafe; running from wild battle.")
+			return run()
+		end
+		if self:isGroundOrWaterWildBattle() then
+			sys.debug("fighting team", "Running from wild Ground/Water Pokemon before Rainbow Badge.")
+			return run()
 		end
 		return false
 	end
 
 	if lowHealth or noUsablePP then
+		self.heroHealRequested = true
 		relog(0, "Relogging before NPC battle: Charmander HP/PP is unsafe.")
 		return true
 	end
@@ -762,22 +907,25 @@ function Quest:handlePreRainbowCharmanderPathSafety()
 		return false
 	end
 
-	local noUsablePP = not game.hasPokemonPPLeft(charmanderIndex)
+	local noUsablePP = not isPokemonUsable(charmanderIndex)
 	local lowHealth = getPokemonHealthPercent(charmanderIndex) < 8
 	if not noUsablePP and not lowHealth then
 		return false
 	end
+
+	self.heroHealRequested = true
 
 	if self:hasActiveBattleNpc() then
 		relog(0, "Relogging before NPC encounter: Charmander HP/PP is unsafe.")
 		return true
 	end
 
+	if getItemQuantity("Escape Rope") > 0 then
+		sys.debug("quest", "Hero HP/PP is unsafe; using Escape Rope to reach a Pokecenter.")
+		return useItem("Escape Rope")
+	end
+
 	if noUsablePP then
-		if getItemQuantity("Escape Rope") > 0 then
-			sys.debug("quest", "Charmander has no offensive PP; using Escape Rope.")
-			return useItem("Escape Rope")
-		end
 		sys.todo("Charmander has no offensive PP and no Escape Rope is available.")
 	end
 	return false
@@ -821,6 +969,16 @@ end
 function Quest:battle()
 	if self:handlePreRainbowCharmanderBattleSafety() then
 		return true
+	end
+
+	if self:isHeroOnlyMode() then
+		local heroPokemonId = self:getHeroPokemonIndex()
+		if self:isGroundOrWaterWildBattle()
+			or self:heroNeedsHealing()
+			or getActivePokemonNumber() ~= heroPokemonId
+		then
+			return self:battleHeroOnly()
+		end
 	end
 
 	-- Before the Rainbow Badge, avoid spending Charmander's resources on
@@ -871,6 +1029,10 @@ function Quest:battle()
 		if useItem("Ultra Ball") or useItem("Great Ball") or useItem("Pokeball") then 
 			return true 
 		end 
+	end
+
+	if self:isHeroOnlyMode() then
+		return self:battleHeroOnly()
 	end
 
 	-- 8th badge Mewtwo fight

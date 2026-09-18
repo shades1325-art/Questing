@@ -90,7 +90,7 @@ function P12RockTunnelQuest:RockTunnel2()
 end
 
 function P12RockTunnelQuest:LavenderTown()
-	if self:needPokecenter() or not game.isTeamFullyHealed() or self.registeredPokecenter ~= "Pokecenter Lavender" then
+	if self:needPokecenter() or self:needsTeamHealingForStory() or self.registeredPokecenter ~= "Pokecenter Lavender" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(9, 5)
 	elseif self:needPokemart() then
@@ -128,10 +128,11 @@ function P12RockTunnelQuest:LavenderPokemart()
 end
 
 function P12RockTunnelQuest:PokecenterLavender()
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(9, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Lavender"
 		return moveToCell(9, 22)
 	end

@@ -36,10 +36,12 @@ function P4BoulderBadgeQuest:isDone()
 end
 
 function P4BoulderBadgeQuest:isTrainingOver()
-	if getTeamSize() >= 2 and team.getHighestLvl() >= self.level then
-		return true
+	local heroTrainingIsOver = self:heroTrainingOver()
+	if heroTrainingIsOver ~= nil then
+		return heroTrainingIsOver
 	end
-	return false
+
+	return getTeamSize() >= 2 and team.getHighestLvl() >= self.level
 end
 
 function P4BoulderBadgeQuest:Route2()
@@ -89,10 +91,11 @@ function P4BoulderBadgeQuest:ViridianMaze()
 end
 
 function P4BoulderBadgeQuest:PokecenterViridian()
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(9, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Viridian"
 		return moveToCell(9, 22)
 	end
@@ -138,18 +141,6 @@ function P4BoulderBadgeQuest:route2Up()
 	end
 end
 
-function P4BoulderBadgeQuest:needPokecenter()
-	-- Missing some PP is normal during training.  Heal only when no living
-	-- party member still has a usable offensive move; otherwise one battle
-	-- would send the team back to Pewter after every encounter.
-	for pokemonId = 1, getTeamSize() do
-		if isPokemonUsable(pokemonId) then
-			return false
-		end
-	end
-	return true
-end
-
 function P4BoulderBadgeQuest:PewterCity()
 	if isNpcOnCell(23, 22) then
 		sys.debug("quest", "Going to talk/fight Red blocking the way.")
@@ -191,10 +182,11 @@ function P4BoulderBadgeQuest:Route3()
 end
 
 function P4BoulderBadgeQuest:PokecenterPewter()
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(9, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Pewter"
 		return moveToCell(9, 22)
 	end

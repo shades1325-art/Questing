@@ -31,10 +31,12 @@ function P5MoonFossilQuest:isDoable()
 end
 
 function P5MoonFossilQuest:isTrainingOver()
-	if getTeamSize() >= 2 and team.getHighestLvl() >= self.level then
-		return true
+	local heroTrainingIsOver = self:heroTrainingOver()
+	if heroTrainingIsOver ~= nil then
+		return heroTrainingIsOver
 	end
-	return false
+
+	return getTeamSize() >= 2 and team.getHighestLvl() >= self.level
 end
 
 function P5MoonFossilQuest:isDone()
@@ -42,10 +44,11 @@ function P5MoonFossilQuest:isDone()
 end
 
 function P5MoonFossilQuest:PokecenterRoute3()
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		self:debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(9, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Route 3"
 		return moveToCell(9, 22)
 	end
@@ -53,13 +56,16 @@ end
 
 function P5MoonFossilQuest:Route3()
 	if self:needPokecenter()
-		or not game.isTeamFullyHealed()
+		or self:needsTeamHealingForStory()
 		or self.registeredPokecenter ~= "Pokecenter Route 3"
 	then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(79, 21)
+	elseif not self:isTrainingOver() then
+		sys.debug("quest", "Going to train Pokemon on Route 3 until level " .. self.level .. ".")
+		return moveToRectangle(79, 38, 85, 38)
 	else
-		sys.debug("quest", "Going to heal Pokemon.")
+		sys.debug("quest", "Going to Mt. Moon.")
 		return moveToCell(84, 16)
 	end
 end
@@ -68,9 +74,6 @@ function P5MoonFossilQuest:MtMoon1F()
 	if self:needPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(38, 63)
-	elseif not self:isTrainingOver() then
-		--sys.debug("quest", "Going to train until Level 28.")
-		return moveToRectangle(22, 53, 40, 53)
 	else
 		sys.debug("quest", "Going to Mt. Moon B1F.")
 		return moveToCell(21, 20) -- Mt. Moon B1F

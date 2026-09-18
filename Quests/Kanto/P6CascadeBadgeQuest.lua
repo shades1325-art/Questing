@@ -46,15 +46,17 @@ function P6CascadeBadgeQuest:isDone()
 end
 
 function P6CascadeBadgeQuest:isTrainingOver()
-	if getTeamSize() >= 2 and team.getHighestLvl() >= self.level then
-		return true
+	local heroTrainingIsOver = self:heroTrainingOver()
+	if heroTrainingIsOver ~= nil then
+		return heroTrainingIsOver
 	end
-	return false
+
+	return getTeamSize() >= 2 and team.getHighestLvl() >= self.level
 end
 
 function P6CascadeBadgeQuest:CeruleanCity()
 	if self:needPokecenter()
-		or not game.isTeamFullyHealed()
+		or self:needsTeamHealingForStory()
 		or self.registeredPokecenter ~= "Pokecenter Cerulean"
 	then
 		sys.debug("quest", "Going to heal Pokemon.")

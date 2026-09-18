@@ -50,7 +50,7 @@ function P14RainbowBadgeQuest:isDone()
 end
 
 function P14RainbowBadgeQuest:CeladonCity()
-	if self:needPokecenter() or not game.isTeamFullyHealed() or self.registeredPokecenter ~= "Pokecenter Celadon" then
+	if self:needPokecenter() or self:needsTeamHealingForStory() or self.registeredPokecenter ~= "Pokecenter Celadon" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(52, 19)
 

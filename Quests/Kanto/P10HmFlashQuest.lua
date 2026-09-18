@@ -111,10 +111,11 @@ function P10HmFlashQuest:Route11()
 end
 
 function P10HmFlashQuest:PokecenterVermilion() -- BlackOut FIX
-	if not game.isTeamFullyHealed() then
+	if self:shouldHealAtPokecenter() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(8, 15)
 	else
+		self.heroHealRequested = false
 		self.registeredPokecenter = "Pokecenter Vermilion"
 		return moveToCell(8, 22)
 	end
