@@ -139,26 +139,11 @@ function P4BoulderBadgeQuest:route2Up()
 end
 
 function P4BoulderBadgeQuest:needPokecenter()
-	local lead = 1
-
-	if getPokemonHealthPercent(lead) < 30 then
-		return true
-	end
-
-	local hasPP = false
-	for i = 1, 4 do
-		local moveName = getPokemonMoveName(lead, i)
-		if moveName and getRemainingPowerPoints(lead, moveName) > 0 then
-			hasPP = true
-			break
-		end
-	end
-
-	if not hasPP then
-		return true
-	end
-
-	return Quest.needPokecenter(self)
+	-- Keep the training and Pokecenter decisions consistent.  The shared
+	-- needPokecenter() helper also considers level-cap usability, which can
+	-- remain false after healing and cause a Pewter/PC loop.  Full HP and PP
+	-- are the actual recovery conditions for this early Kanto quest.
+	return not game.isTeamFullyHealed()
 end
 
 function P4BoulderBadgeQuest:PewterCity()
@@ -172,7 +157,6 @@ function P4BoulderBadgeQuest:PewterCity()
 		sys.debug("quest", "Going to Route 3")
 		return moveToCell(65, 34)
 	elseif self.registeredPokecenter ~= "Pokecenter Pewter"
-		or not game.isTeamFullyHealed()
 		or self:needPokecenter()
 	then
 		sys.debug("quest", "Going to heal Pokemon.")

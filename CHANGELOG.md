@@ -5,6 +5,8 @@
 - Make the Pewter City step honor the quest's HP/PP healing check before
   sending the team back to Route 2, preventing the Pewter/Route 2 loop when
   the lead Pokémon has no usable PP.
+- Use the same full HP/PP condition inside the quest's healing helper so a
+  fully healed team is not sent back to the Pokecenter repeatedly.
 
 ## 2026-09-19 (account-specific quest flags)
 
