@@ -1,4 +1,12 @@
-﻿# Changelog
+# Changelog
+
+## 2026-09-19 (Viridian movement API fix)
+
+- Replaced the Viridian requests quest's obsolete moveToMap actions with
+  moveToCell transitions using the existing Viridian, Route 1, and Route 2
+  map-link coordinates.
+- Added intermediate Route 2 Stop and Route 2_C handlers so Gerrald
+  completion and PC returns can resume through the current movement API.
 
 ## 2026-09-19 (rod purchases disabled)
 

@@ -92,6 +92,10 @@ function P3ViridianRequestsQuest:new()
 	o.sentretTurnedIn = hasViridianFlag(SENTRET_JENNY_FLAG)
 	o.pokemon = nil
 	o.forceCaught = false
+	-- Remember the intended destination while crossing the intermediate
+	-- Viridian/Route 2 map links.  The current client no longer supports
+	-- moveToMap(), so each hop is performed with moveToCell().
+	o.navigationTarget = nil
 
 	-- PC requirement state. This deliberately uses the existing PC globals
 	-- instead of adding another party/PC manager.
@@ -191,7 +195,8 @@ end
 function P3ViridianRequestsQuest:ViridianForest()
 	if self.gerraldDefeated then
 		sys.debug("Viridian requests", "Gerrald defeated; going to Route 1.")
-		return moveToMap("Route 1")
+		self.navigationTarget = "route1"
+		return moveToCell(40, 70) -- Viridian Forest -> Route 2 Stop
 	end
 
 	-- Prefer the live trainer position. This keeps the quest independent of a
@@ -210,7 +215,8 @@ function P3ViridianRequestsQuest:ViridianForest()
 	-- handler, the requested battle has completed.
 	if self.gerraldApproached then
 		self:markGerraldDefeated()
-		return moveToMap("Route 1")
+		self.navigationTarget = "route1"
+		return moveToCell(40, 70) -- Viridian Forest -> Route 2 Stop
 	end
 
 	-- Use the confirmed cell when it is supplied later. It is checked only
@@ -359,7 +365,8 @@ function P3ViridianRequestsQuest:finishPcOperation()
 	self.pcScan = nil
 	self.pcScanTarget = nil
 	self.pcScanNeedsHair = false
-	return moveToMap("Route 1")
+	self.navigationTarget = "route1"
+	return moveToCell(9, 22) -- Pokecenter Viridian -> Viridian City
 end
 
 function P3ViridianRequestsQuest:processPcOperation()
@@ -479,7 +486,8 @@ end
 function P3ViridianRequestsQuest:Route1()
 	if self.sentretTurnedIn then
 		self.pokemon = nil
-		return moveToMap("Route 2")
+		self.navigationTarget = "route2"
+		return moveToCell(14, 4) -- Route 1 -> Route 1 Stop House
 	end
 
 	if self:takeTeamRattataHair() then
@@ -493,7 +501,8 @@ function P3ViridianRequestsQuest:Route1()
 		if not self:hasTargetPokemon("Rattata") then
 			if getTeamSize() >= 6 and not self.pcScanned.Rattata then
 				self:beginPcScan("Rattata", true)
-				return moveToMap("Pokecenter Viridian")
+				self.navigationTarget = "pokecenter"
+				return moveToCell(14, 4) -- Route 1 -> Route 1 Stop House
 			end
 			return moveToRectangle(
 				RATTATA_RECTANGLE[1], RATTATA_RECTANGLE[2],
@@ -504,7 +513,8 @@ function P3ViridianRequestsQuest:Route1()
 		if self:getRattataHairCount() < 3 then
 			if not self.pcScanned.Rattata then
 				self:beginPcScan("Rattata", true)
-				return moveToMap("Pokecenter Viridian")
+				self.navigationTarget = "pokecenter"
+				return moveToCell(14, 4) -- Route 1 -> Route 1 Stop House
 			end
 			return moveToRectangle(
 				RATTATA_RECTANGLE[1], RATTATA_RECTANGLE[2],
@@ -522,7 +532,8 @@ function P3ViridianRequestsQuest:Route1()
 	if not self:hasTargetPokemon("Sentret") then
 		if getTeamSize() >= 6 and not self.pcScanned.Sentret then
 			self:beginPcScan("Sentret", false)
-			return moveToMap("Pokecenter Viridian")
+			self.navigationTarget = "pokecenter"
+			return moveToCell(14, 4) -- Route 1 -> Route 1 Stop House
 		end
 		return moveToRectangle(
 			SENTRET_RECTANGLE[1], SENTRET_RECTANGLE[2],
@@ -541,7 +552,8 @@ function P3ViridianRequestsQuest:PokecenterViridian()
 	end
 
 	if self.pcScanTarget == nil then
-		return moveToMap("Route 1")
+		self.navigationTarget = "route1"
+		return moveToCell(9, 22) -- Pokecenter Viridian -> Viridian City
 	end
 
 	if not isPCOpen() then
@@ -557,28 +569,57 @@ function P3ViridianRequestsQuest:PokecenterViridian()
 		return self:processPcOperation()
 	end
 
-	return moveToMap("Route 1")
+	self.navigationTarget = "route1"
+	return moveToCell(9, 22) -- Pokecenter Viridian -> Viridian City
 end
 
 function P3ViridianRequestsQuest:ViridianCity()
-	if self.pcScanTarget ~= nil or self.pcOperation ~= nil then
-		return moveToMap("Pokecenter Viridian")
+	if self.pcScanTarget ~= nil or self.pcOperation ~= nil or self.navigationTarget == "pokecenter" then
+		self.navigationTarget = "pokecenter"
+		return moveToCell(44, 43) -- Viridian City -> Pokecenter Viridian
 	end
-	if self.sentretTurnedIn then
-		return moveToMap("Route 2")
+	if self.sentretTurnedIn or self.navigationTarget == "route2" then
+		self.navigationTarget = "route2"
+		return moveToCell(37, 0) -- Viridian City -> Route 2_C/Route 2
 	end
-	return moveToMap("Route 1")
+	self.navigationTarget = "route1"
+	return moveToCell(48, 61) -- Viridian City -> Route 1 Stop House
 end
 
 function P3ViridianRequestsQuest:Route1StopHouse()
-	return moveToMap("Route 1")
+	if self.navigationTarget == "route2" or self.navigationTarget == "pokecenter" then
+		return moveToCell(3, 2) -- Route 1 Stop House -> Viridian City
+	end
+	return moveToCell(3, 12) -- Route 1 Stop House -> Route 1
 end
 
 function P3ViridianRequestsQuest:Route2()
 	if self.sentretTurnedIn then
 		return false
 	end
-	return moveToMap("Viridian Forest")
+	if self.navigationTarget == "route1" or self.gerraldDefeated then
+		self.navigationTarget = "route1"
+		return moveToCell(10, 130) -- Route 2_C/Route 2 -> Viridian City
+	end
+	self.navigationTarget = "forest"
+	return moveToCell(16, 96) -- Route 2 -> Route 2 Stop
+end
+
+function P3ViridianRequestsQuest:Route2Stop()
+	if self.navigationTarget == "route1" then
+		return moveToCell(3, 12) -- Route 2 Stop -> Route 2_C
+	end
+	return moveToCell(4, 2) -- Route 2 Stop -> Viridian Forest
+end
+
+-- Some Pathfinder map data exposes the lower Route 2 segment as Route 2_C;
+-- keep an explicit handler so the shared Quest dispatcher never falls back to
+-- the removed moveToMap() API if that map name is reported by the client.
+function P3ViridianRequestsQuest:Route2_C()
+	if self.navigationTarget == "route1" then
+		return moveToCell(10, 130) -- Route 2_C -> Viridian City
+	end
+	return moveToCell(15, 96) -- Route 2_C -> Route 2 Stop
 end
 
 function P3ViridianRequestsQuest:dialog(message)
