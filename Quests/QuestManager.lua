@@ -38,7 +38,6 @@ end
 local P1StartKantoQuest				= require('Quests/Kanto/P1StartKantoQuest')
 local P2PalletStartQuest			= require('Quests/Kanto/P2PalletStartQuest')
 local P3ViridianSchoolQuest			= require('Quests/Kanto/P3ViridianSchoolQuest')
-local P3ViridianRequestsQuest			= require('Quests/Kanto/P3ViridianRequestsQuest')
 local P4BoulderBadgeQuest			= require('Quests/Kanto/P4BoulderBadgeQuest')
 local P5MoonFossilQuest				= require('Quests/Kanto/P5MoonFossilQuest')
 local P6CascadeBadgeQuest			= require('Quests/Kanto/P6CascadeBadgeQuest')
@@ -119,7 +118,6 @@ local quests = {
 	P1StartKantoQuest:new(),
 	P2PalletStartQuest:new(),
 	P3ViridianSchoolQuest:new(),
-	P3ViridianRequestsQuest:new(),
 	P4BoulderBadgeQuest:new(),
 	P5MoonFossilQuest:new(),
 	P6CascadeBadgeQuest:new(),

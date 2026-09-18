@@ -7,5 +7,5 @@ modules are kept in `Libs/`, `Quests/`, `Classes/`, and `Data/`.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete change history, including
-the Viridian School, Gerrald, and Officer Jenny quest flow.
+See [CHANGELOG.md](CHANGELOG.md) for the complete change history and current
+regional story flow.

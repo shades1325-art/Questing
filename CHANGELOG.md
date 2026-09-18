@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-19 (restore standard Kanto quest flow)
+
+- Removed the Officer Jenny/Gerrald/Rattata/Sentret side quest from the active
+  QuestManager so progression continues normally after Viridian School.
+- Removed its unused Gerrald cell configuration.
+
 ## 2026-09-19 (Johto E4 Blackthorn hand-off)
 
 - Fixed the Elite 4 Johto quest returning no action in Blackthorn City after
