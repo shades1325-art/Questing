@@ -6,6 +6,11 @@ BUY_RODS = true                 -- true: buy rods, false: buy not
 --regional - kanto
 KANTO_STARTER_ID = 2          -- nil: random, 1: Bulbasaur, 2: Charmander, 3: Squirtle, 4: Pikachu
 
+-- Viridian side-story configuration. Set this after the Bug Catcher
+-- Gerrald cell is confirmed, for example:
+-- VIRIDIAN_GERRALD_CELL = { x = 10, y = 20 }
+VIRIDIAN_GERRALD_CELL = nil
+
 KANTO_FOSSIL_ID = 2           -- nil: random, 1: Helix, 2: Dome
 KANTO_DOJO_POKEMON_ID = nil     -- nil: random, 1: Hitmonchan, 2: Hitmonlee
 

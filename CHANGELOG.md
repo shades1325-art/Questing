@@ -1,5 +1,16 @@
 ﻿# Changelog
 
+## 2026-09-18 (Viridian requests)
+
+- Added the reusable Viridian side-story quest after Viridian School.
+- Added Bug Catcher Gerrald handling in Viridian Forest with an editable
+  VIRIDIAN_GERRALD_CELL placeholder and active-battler fallback.
+- Added Route 1 Rattata capture, Rattata Hair collection, and Officer Jenny
+  turn-in handling at (50, 43).
+- Added Route 1 Sentret capture and the second Officer Jenny turn-in.
+- Reused existing Lua battle, capture, movement, PC, and pathfinder APIs;
+  no C# or networking code was changed.
+
 ## 2026-09-18
 
 - Kept `BetterQuesting.lua` as the single story entry point and retained the shared `QuestManager` architecture.
