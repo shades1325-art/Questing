@@ -5,16 +5,31 @@
 
 local QuestManager = {}
 
-local COMPLETED_QUESTS_FILE = "quest_completed_flags.txt"
+local COMPLETED_QUESTS_FILE_PREFIX = "flag/quest_completed_flags_"
 local COMPLETED_QUEST_PREFIX = "completed:"
 
-local function loadCompletedQuestFlags()
+local function getCompletedQuestFlagsFile()
+	local accountName = "unknown"
+	if type(getAccountName) == "function" then
+		accountName = getAccountName()
+	end
+
+	accountName = tostring(accountName or "unknown")
+	accountName = string.gsub(accountName, "[^%w_]", "_")
+	if accountName == "" then
+		accountName = "unknown"
+	end
+
+	return COMPLETED_QUESTS_FILE_PREFIX .. accountName .. ".txt"
+end
+
+local function loadCompletedQuestFlags(file)
 	local flags = {}
 	if type(readLinesFromFile) ~= "function" then
 		return flags
 	end
 
-	local lines = readLinesFromFile(COMPLETED_QUESTS_FILE)
+	local lines = readLinesFromFile(file)
 	if type(lines) ~= "table" then
 		return flags
 	end
@@ -201,7 +216,8 @@ function QuestManager:new(o)
 	o.selected = nil
 	o.isOver = false
 	o.lastRelog = os.time()
-	o.completedQuestFlags = loadCompletedQuestFlags()
+	o.completedQuestFlagsFile = getCompletedQuestFlagsFile()
+	o.completedQuestFlags = loadCompletedQuestFlags(o.completedQuestFlagsFile)
 	return o
 end
 
@@ -228,7 +244,7 @@ function QuestManager:markQuestCompleted(quest)
 		end
 	end
 	table.sort(flags)
-	logToFile(COMPLETED_QUESTS_FILE, flags, true)
+	logToFile(self.completedQuestFlagsFile, flags, true)
 	return true
 end
 

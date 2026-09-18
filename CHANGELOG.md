@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-19 (account-specific quest flags)
+
+- Quest completion flags now use `getAccountName()` and are stored separately
+  under `Logs/flag/quest_completed_flags_<account>.txt`.
+- Multiple accounts no longer share or overwrite the same completion state.
+
 ## 2026-09-19 (restore standard Kanto quest flow)
 
 - Removed the Officer Jenny/Gerrald/Rattata/Sentret side quest from the active
