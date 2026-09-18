@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-19 (Johto E4 Blackthorn hand-off)
+
+- Fixed the Elite 4 Johto quest returning no action in Blackthorn City after
+  healing; it now uses the existing Route 45 `moveToCell(20, 50)` link.
+- Returned the Pokecenter action so healing does not depend on a stale queued
+  movement command.
+
 ## 2026-09-19 (Officer Jenny quest pickup)
 
 - Require the Viridian requests quest to be accepted from Officer Jenny after

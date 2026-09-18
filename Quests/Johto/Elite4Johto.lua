@@ -108,24 +108,17 @@ function Elite4Johto:BlackthornCity()
 	if not game.isTeamFullyHealed() or self.registeredPokecenter ~= "Pokecenter Blackthorn" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(29, 39)
-	elseif self.checkedForBestPokemon then
-		if not game.hasPokemonWithMove("Surf") then
-			if self.pokemonId < getTeamSize() then
-				useItemOnPokemon("HM03 - Surf", self.pokemonId)
-				log("Pokemon: " .. self.pokemonId .. " Try Learning: HM03 - Surf")
-				self.pokemonId = self.pokemonId + 1
-			else
-				fatal("No pokemon in this team can learn Surf")
-			end
-		else
-			sys.debug("quest", "Going to Johto E4.")
-			return moveToCell(20, 50)
-		end
+	else
+		-- The Route 45 link is the next map transition from Blackthorn City.
+		-- The old checkedForBestPokemon branch could return nil here because
+		-- that flag was never initialized by this quest, stopping the bot.
+		sys.debug("quest", "Going to Johto E4.")
+		return moveToCell(20, 50)
 	end
 end
 
 function Elite4Johto:PokecenterBlackthorn()
-	self:pokecenter("Blackthorn City")
+	return self:pokecenter("Blackthorn City")
 end
 
 function Elite4Johto:Route45()
