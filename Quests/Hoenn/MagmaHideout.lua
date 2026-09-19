@@ -33,6 +33,70 @@ function MagmaHideOut:isDone()
 	end
 end
 
+-- If the account is resumed in Lilycove while the Red Orb is still held,
+-- this quest must be allowed to take it back to Jagged Pass before the Aqua
+-- Hideout quest becomes selectable.
+-- A stale flag must not skip the Magma/Jagged Pass prerequisite while the
+-- Red Orb is still in the inventory.
+function MagmaHideOut:isPersistentCompletionValid()
+	return not hasItem("Red Orb")
+end
+
+function MagmaHideOut:LilycoveCity()
+	if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Lilycove City" then
+		sys.debug("quest", "Going to heal Pokemon before Jagged Pass.")
+		return moveToCell(26, 20)
+	else
+		sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+		return moveToCell(0, 22)
+	end
+end
+
+function MagmaHideOut:PokecenterLilycoveCity()
+	return self:pokecenter("Lilycove City")
+end
+
+function MagmaHideOut:Route121()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(0, 13)
+end
+
+function MagmaHideOut:Route120()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(0, 7)
+end
+
+-- Pathfinder uses the suffixed Hoenn map names for these split routes.
+-- Keep the unsuffixed handlers above for servers that report the legacy
+-- names, and provide exact-name aliases for the current map templates.
+function MagmaHideOut:Route120_A()
+	return self:Route120()
+end
+
+function MagmaHideOut:FortreeCity()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(0, 14)
+end
+
+function MagmaHideOut:Route119A()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(11, 100)
+end
+
+function MagmaHideOut:Route119B()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(26, 100)
+end
+
+function MagmaHideOut:Route118_B()
+	sys.debug("quest", "Going to Jagged Pass before Aqua Hideout.")
+	return moveToCell(28, 19)
+end
+
+function MagmaHideOut:Route118_A()
+	return self:Route118()
+end
+
 function MagmaHideOut:MtPyreSummit()
 	sys.debug("quest", "Going to Magma Hideout.")
 	return moveToCell(25, 79)

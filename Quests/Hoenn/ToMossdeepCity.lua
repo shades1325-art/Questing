@@ -42,20 +42,18 @@ function ToMossdeepCity:new()
 end
 
 function ToMossdeepCity:isDoable()
-	-- The orb can still be in the inventory when the account arrives in
-	-- Lilycove.  The old `not Red orb` gate prevented this quest from ever
-	-- becoming selectable in that state, leaving the account with no quest
-	-- method for the city.  Blue/Red Orb possession is the story marker for
-	-- this segment; Mind Badge still ends it.
+	-- The Red Orb is the prerequisite for the Jagged Pass/Magma sequence.
+	-- Do not start the Lilycove Aqua sequence until that prerequisite has
+	-- consumed the Red Orb.  MagmaHideout.lua handles the earlier segment.
 	if self:hasMap()
-		and (hasItem("Blue Orb") or hasItem("Red Orb"))
+		and hasItem("Blue Orb")
+		and not hasItem("Red Orb")
 		and not hasItem("Mind Badge")
 	then
 		return true
 	end
 	return false
 end
-
 function ToMossdeepCity:isDone()
 	if hasItem("Mind Badge") then
 		return true
@@ -163,6 +161,17 @@ function ToMossdeepCity:LilycoveCity()
 		return moveToCell(26, 20)
 
 	elseif not dialogs.finaqua.state then
+		-- The hideout link is at (81, 8), but the current Lilycove map
+		-- places Officer Han on the only accessible water tile below it
+		-- (81, 9).  A direct moveToCell(81, 8) can therefore never build a
+		-- route: the pathfinder correctly treats the officer as a blocker.
+		-- Approach the officer through the normal NPC action so the shared
+		-- NPC collision-bypass/interaction flow can open the hideout.
+		if isNpcOnCell(81, 9) then
+			sys.debug("quest", "Going to enter Aqua Hideout.")
+			return talkToNpcOnCell(81, 9)
+		end
+
 		sys.debug("quest", "Going to fight Aqua Clearout.")
 		return moveToCell(81, 8)
 
@@ -218,7 +227,11 @@ function ToMossdeepCity:TeamAquaHideoutB1F()
 			sys.debug("quest", "Going to fight Shelly.")
 			return talkToNpcOnCell(38, 18)
 		else
+			-- The battle callback removes Shelly from the map.  Keep the
+			-- state transition and issue the next movement in the same tick;
+			-- returning nil here makes BotClient stop with "No action executed".
 			self.shellyBeaten = true
+			return moveToCell(35, 20)
 		end
 	end
 end
@@ -262,6 +275,9 @@ function ToMossdeepCity:TeamAquaHideoutB2F()
 		if isNpcOnCell(28, 30) then
 			sys.debug("quest", "Going to fight Magma Grunt.")
 			return talkToNpcOnCell(28, 30)
+		else
+			-- Continue after the grunt disappears instead of returning nil.
+			return moveToCell(23, 17)
 		end
 	end
 end

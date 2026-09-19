@@ -222,6 +222,12 @@ function QuestManager:new(o)
 end
 
 function QuestManager:isQuestPersistentlyCompleted(quest)
+
+	-- A persisted flag is only a shortcut; quests may define a small
+	-- objective check so a stale flag cannot skip a required badge/story item.
+	if quest and not quest:isPersistentCompletionValid() then
+		return false
+	end
 	local key = completedQuestKey(quest)
 	return key ~= nil and self.completedQuestFlags[key] == true
 end

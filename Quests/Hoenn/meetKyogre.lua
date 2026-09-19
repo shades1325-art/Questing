@@ -72,7 +72,8 @@ function meetKyogre:MossdeepCity()
 		return moveToCell(83, 21)
 
 	elseif not game.hasPokemonWithMove("Dive") then
-		if self.pokemonId < getTeamSize() then
+		-- Include the last party slot; Swampert may be the only valid Dive user.
+		if self.pokemonId <= getTeamSize() then
 			useItemOnPokemon("HM06 - Dive", self.pokemonId)
 			log("Pokemon: " .. self.pokemonId .. " Try Learning: HM06 - Dive")
 			self.pokemonId = self.pokemonId + 1

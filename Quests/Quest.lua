@@ -48,6 +48,10 @@ end
 function Quest:isDone()
 	return self:isDoable() == false
 end
+
+function Quest:isPersistentCompletionValid()
+	return true
+end
 function Quest:debug(tag, message)
     local fullMsg = tostring(tag) .. ": " .. tostring(message)
     local now = os.time()

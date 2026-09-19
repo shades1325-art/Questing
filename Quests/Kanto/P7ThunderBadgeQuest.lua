@@ -59,6 +59,10 @@ function P7ThunderBadgeQuest:isDone()
 	end
 end
 
+-- Do not trust a stale completion flag when the Thunder Badge is missing.
+function P7ThunderBadgeQuest:isPersistentCompletionValid()
+	return hasItem("Thunder Badge")
+end
 function P7ThunderBadgeQuest:Route5()
 	sys.debug("quest", "Going to Vermilion City.")
 	return moveToCell(27,29)
