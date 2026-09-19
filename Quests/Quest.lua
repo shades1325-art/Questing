@@ -880,7 +880,10 @@ function Quest:battleHeroOnly()
 		return relog(0, "Relogging: unable to send hero Pokemon.")
 	end
 
-	if attack() or useAnyMove() then
+	-- Do not call useAnyMove() after attack() fails here. Its C# fallback sends
+	-- Struggle when all PP is gone, which defeats the hero-only wild-battle
+	-- recovery policy and can KO Charmander/Charmeleon.
+	if attack() then
 		return true
 	end
 	if isWildBattle() then

@@ -177,6 +177,12 @@ function DynamoBadge:MauvilleCityGym()
 			elseif game.inRectangle(1, 14, 4, 16) then
 				sys.debug("quest", "Moving in front of Wattson, going to remove all barriers.")
 				return moveToCell(7, 3)
+			else
+				-- The gym can briefly leave the player at (7,18) while the
+				-- server publishes the next puzzle state. Treat that as an
+				-- intentional bounded wait. The next puzzle-state branch will
+				-- request movement and automatically resume stuck detection.
+				return waitForState(2000)
 			end
 
 		else
