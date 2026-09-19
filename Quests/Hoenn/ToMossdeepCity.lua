@@ -42,7 +42,15 @@ function ToMossdeepCity:new()
 end
 
 function ToMossdeepCity:isDoable()
-	if self:hasMap() and not hasItem("Red orb") and not hasItem("Mind Badge") then
+	-- The orb can still be in the inventory when the account arrives in
+	-- Lilycove.  The old `not Red orb` gate prevented this quest from ever
+	-- becoming selectable in that state, leaving the account with no quest
+	-- method for the city.  Blue/Red Orb possession is the story marker for
+	-- this segment; Mind Badge still ends it.
+	if self:hasMap()
+		and (hasItem("Blue Orb") or hasItem("Red Orb"))
+		and not hasItem("Mind Badge")
+	then
 		return true
 	end
 	return false

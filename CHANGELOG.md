@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-20 (Story recovery and progression fixes)
+
+- Allow the Hoenn Mossdeep quest to resume in Lilycove while an orb remains
+  in the inventory.
+- Treat the Vermilion Lance event as a required story battle; rotate to the
+  existing party fallback instead of relogging when Charizard faints.
+- Add a reconnect delay to hero recovery relogs and fix the Bill's House exit
+  transition.
+
 ## 2026-09-19 (Hoenn Littleroot rescue battle)
 
 - Fight the required Birch rescue encounter at Lab Littleroot Town even

@@ -13,6 +13,10 @@ local DEBUG_REPEAT_INTERVAL_SECONDS = 1
 
 local PRE_RAINBOW_ESCAPE_ROPE_LIMIT = 5
 local ESCAPE_ROPE_PRICE = 550
+-- Give the server enough time to finish the logout before reconnecting.
+-- Keep this centralized because recovery relogs can otherwise hit the
+-- server login cooldown when they use relog(0, ...).
+local HERO_RECOVERY_RELOG_DELAY_SECONDS = 15
 local charmanderLine = {
 	Charmander = true,
 	Charmeleon = true,
@@ -843,13 +847,13 @@ end
 function Quest:runFromWildBattleOrRecover()
 	if not self.canRun then
 		self.heroHealRequested = true
-		return relog(0, "Relogging: wild battle cannot be escaped.")
+		return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: wild battle cannot be escaped.")
 	end
 	if run() then
 		return true
 	end
 	self.heroHealRequested = true
-	return relog(0, "Relogging: unable to run from wild battle.")
+	return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: unable to run from wild battle.")
 end
 
 function Quest:battleHeroOnly()
@@ -867,7 +871,7 @@ function Quest:battleHeroOnly()
 		if isWildBattle() then
 			return self:runFromWildBattleOrRecover()
 		end
-		return relog(0, "Relogging before NPC battle: hero HP/PP is unsafe.")
+		return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging before NPC battle: hero HP/PP is unsafe.")
 	end
 
 	if getActivePokemonNumber() ~= heroPokemonId then
@@ -877,7 +881,7 @@ function Quest:battleHeroOnly()
 		if isWildBattle() then
 			return self:runFromWildBattleOrRecover()
 		end
-		return relog(0, "Relogging: unable to send hero Pokemon.")
+		return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: unable to send hero Pokemon.")
 	end
 
 	-- Do not call useAnyMove() after attack() fails here. Its C# fallback sends
@@ -889,7 +893,7 @@ function Quest:battleHeroOnly()
 	if isWildBattle() then
 		return self:runFromWildBattleOrRecover()
 	end
-	return relog(0, "Relogging: no usable hero battle action.")
+	return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: no usable hero battle action.")
 end
 
 -- Before the Rainbow Badge, Charmander is kept out of unsafe NPC battles.
@@ -897,6 +901,12 @@ end
 -- path tick can then use an Escape Rope outside battle.
 function Quest:handlePreRainbowCharmanderBattleSafety()
 	if hasItem("Rainbow Badge") then
+		return false
+	end
+	-- Required story encounters must be completed even when the hero is low
+	-- on HP/PP; their quest-specific battle policy rotates the party instead
+	-- of relogging before the NPC battle can finish.
+	if self:isRequiredStoryBattle() then
 		return false
 	end
 
@@ -923,7 +933,7 @@ function Quest:handlePreRainbowCharmanderBattleSafety()
 
 	if lowHealth or noUsablePP then
 		self.heroHealRequested = true
-		relog(0, "Relogging before NPC battle: Charmander HP/PP is unsafe.")
+		relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging before NPC battle: Charmander HP/PP is unsafe.")
 		return true
 	end
 	return false
@@ -933,6 +943,11 @@ end
 -- normal out-of-battle movement action until the battle callback has ended.
 function Quest:handlePreRainbowCharmanderPathSafety()
 	if hasItem("Rainbow Badge") then
+		return false
+	end
+	-- Do not block the path into a required story battle.  The corresponding
+	-- battle callback will attack and rotate the party when necessary.
+	if self:isRequiredStoryBattle() then
 		return false
 	end
 
@@ -961,7 +976,7 @@ function Quest:handlePreRainbowCharmanderPathSafety()
 	end
 
 	if self:hasActiveBattleNpc() then
-		relog(0, "Relogging before NPC encounter: Charmander HP/PP is unsafe.")
+		relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging before NPC encounter: Charmander HP/PP is unsafe.")
 		return true
 	end
 
@@ -1012,8 +1027,16 @@ function Quest:battle()
 	end
 
 	if self:isRequiredStoryBattle() then
-		sys.debug("fighting team", "Required story battle: attacking instead of running.")
-		return attack() or useAnyMove()
+		sys.debug("fighting team", "Required story battle: attacking and rotating the party.")
+		-- Required NPC/story battles must be completed.  Keep this in Lua so
+		-- the story controller remains responsible for the battle flow: attack
+		-- first, then use the existing party fallbacks when the active Pokemon
+		-- faints or has no usable offensive PP.  Do not fall through to the
+		-- pre-Rainbow hero recovery relog for these encounters.
+		return attack()
+			or sendUsablePokemon()
+			or sendAnyPokemon()
+			or useAnyMove()
 	end
 
 	if self:isHeroOnlyMode() then
@@ -1058,7 +1081,7 @@ function Quest:battle()
 	if hasItem("Rainbow Badge") and isWildBattle() and not self:isRequiredStoryBattle() then
 		if not self.canRun then
 			self.heroHealRequested = true
-			return relog(0, "Relogging: wild battle cannot be escaped.")
+			return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: wild battle cannot be escaped.")
 		end
 		self:debug("fighting team", "Rainbow Badge complete: running from wild battle.")
 		return self:runFromWildBattleOrRecover()

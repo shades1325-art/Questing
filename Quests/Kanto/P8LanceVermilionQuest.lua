@@ -23,6 +23,14 @@ function P8LanceVermilionQuest:isDone()
 	return getMapName() == "Pokecenter Vermilion"
 end
 
+-- The Lance event is a required NPC battle, even though it occurs before the
+-- Rainbow Badge.  Mark it explicitly so the shared Quest battle policy does
+-- not apply the Charmander-only low-HP/PP relog rule while the event still
+-- has trainers left to defeat.
+function P8LanceVermilionQuest:isRequiredStoryBattle()
+	return getMapName() == "Vermilion City 2"
+end
+
 function P8LanceVermilionQuest:VermilionCity2()
 	sys.debug("quest", "Going to talk to NPC.")
 	return talkToNpcOnCell(44, 30)

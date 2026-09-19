@@ -31,10 +31,10 @@ function P6CascadeBadgeQuest:new()
 end
 
 function P6CascadeBadgeQuest:isDoable()
-	if self:hasMap() and not hasItem("HM01 - Cut") then
-		return true
-	end
-	return false
+	-- HM01 is obtained later in the Kanto sequence.  It must not prevent
+	-- this quest from resuming when the account reconnects inside Bill's
+	-- House; the quest's actual completion checkpoint is Route 5.
+	return self:hasMap() and not self:isDone()
 end
 
 function P6CascadeBadgeQuest:isDone()
@@ -154,6 +154,21 @@ function P6CascadeBadgeQuest:Route25()
 	else
 		sys.debug("quest", "Going back to Cerulean City.")
 		moveToCell(14, 30)
+	end
+end
+
+function P6CascadeBadgeQuest:BillsHouse() -- get the S.S. Anne ticket
+	if dialogs.billTicketDone.state then
+		-- The current map's Route 25 link is directly below the spawn/door at
+		-- (12,16).  The old (10,13) destination is walkable but is not an exit
+		-- on this map and can leave the movement watchdog waiting indefinitely.
+		return moveToCell(12, 17)
+	elseif dialogs.bookPillowDone.state then
+		-- Bill is at the north side of the house.
+		return talkToNpcOnCell(13, 11)
+	else
+		-- Interact with Bill's research book before talking to Bill.
+		return talkToNpcOnCell(21, 12)
 	end
 end
 
