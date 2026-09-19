@@ -9,6 +9,7 @@ local blacklist = require "blacklist"
 local Quest = {}
 Quest.lastDebugMessage = nil
 Quest.repeatCount = 0
+local DEBUG_REPEAT_INTERVAL_SECONDS = 1
 
 local PRE_RAINBOW_ESCAPE_ROPE_LIMIT = 5
 local ESCAPE_ROPE_PRICE = 550
@@ -44,15 +45,23 @@ function Quest:isDone()
 	return self:isDoable() == false
 end
 function Quest:debug(tag, message)
-    local fullMsg = tag .. ": " .. message
-    if self.lastDebugMessage == fullMsg then
-        self.repeatCount = self.repeatCount + 1
-    else
+    local fullMsg = tostring(tag) .. ": " .. tostring(message)
+    local now = os.time()
+    local isNewMessage = self.lastDebugMessage ~= fullMsg
+    if isNewMessage then
         self.repeatCount = 1
         self.lastDebugMessage = fullMsg
+    else
+        self.repeatCount = self.repeatCount + 1
     end
 
-    sys.debug(tag, message)
+    if isNewMessage
+        or self.lastDebugAt == nil
+        or os.difftime(now, self.lastDebugAt) >= DEBUG_REPEAT_INTERVAL_SECONDS
+    then
+        self.lastDebugAt = now
+        sys.debug(tag, message)
+    end
 
     -- nếu cùng message lặp >= 6 lần thì relog
     if self.repeatCount >= 6 then
@@ -828,6 +837,21 @@ function Quest:hasActiveBattleNpc()
 	return false
 end
 
+-- Run is still the first choice for wild-battle recovery.  If the active
+-- Pokemon has fainted or the client cannot issue Run, do not return false and
+-- let BotClient stop the script; reconnect so the story can heal and resume.
+function Quest:runFromWildBattleOrRecover()
+	if not self.canRun then
+		self.heroHealRequested = true
+		return relog(0, "Relogging: wild battle cannot be escaped.")
+	end
+	if run() then
+		return true
+	end
+	self.heroHealRequested = true
+	return relog(0, "Relogging: unable to run from wild battle.")
+end
+
 function Quest:battleHeroOnly()
 	local heroPokemonId = self:getHeroPokemonIndex()
 	if heroPokemonId == nil then
@@ -835,13 +859,13 @@ function Quest:battleHeroOnly()
 	end
 
 	if self:isGroundOrWaterWildBattle() then
-		return run()
+		return self:runFromWildBattleOrRecover()
 	end
 
 	if self:heroNeedsHealing() then
 		self.heroHealRequested = true
 		if isWildBattle() then
-			return run()
+			return self:runFromWildBattleOrRecover()
 		end
 		return relog(0, "Relogging before NPC battle: hero HP/PP is unsafe.")
 	end
@@ -851,7 +875,7 @@ function Quest:battleHeroOnly()
 			return true
 		end
 		if isWildBattle() then
-			return run()
+			return self:runFromWildBattleOrRecover()
 		end
 		return relog(0, "Relogging: unable to send hero Pokemon.")
 	end
@@ -860,7 +884,7 @@ function Quest:battleHeroOnly()
 		return true
 	end
 	if isWildBattle() then
-		return run()
+		return self:runFromWildBattleOrRecover()
 	end
 	return relog(0, "Relogging: no usable hero battle action.")
 end
@@ -885,11 +909,11 @@ function Quest:handlePreRainbowCharmanderBattleSafety()
 		if lowHealth or noUsablePP then
 			self.heroHealRequested = true
 			sys.debug("fighting team", "Hero HP/PP is unsafe; running from wild battle.")
-			return run()
+			return self:runFromWildBattleOrRecover()
 		end
 		if self:isGroundOrWaterWildBattle() then
 			sys.debug("fighting team", "Running from wild Ground/Water Pokemon before Rainbow Badge.")
-			return run()
+			return self:runFromWildBattleOrRecover()
 		end
 		return false
 	end
@@ -1023,8 +1047,12 @@ function Quest:battle()
 	-- opponent/party state for wild encounters.  The battle callback can go
 	-- straight to the existing Lua run action instead.
 	if hasItem("Rainbow Badge") and isWildBattle() and not self:isRequiredStoryBattle() then
-		sys.debug("fighting team", "Rainbow Badge complete: running from wild battle.")
-		return run()
+		if not self.canRun then
+			self.heroHealRequested = true
+			return relog(0, "Relogging: wild battle cannot be escaped.")
+		end
+		self:debug("fighting team", "Rainbow Badge complete: running from wild battle.")
+		return self:runFromWildBattleOrRecover()
 	end
 
 	-- catching
@@ -1171,9 +1199,22 @@ function Quest:battleMessage(message)
 		if hasItem("Thunder Badge") and not hasItem("Bicycle")  then
         	sys.debug("quest", "Need $" .. 60000 - getMoney() .. " more money, so we can buy the bike.")
 		end
+	-- A failed Run can be retried.  It is different from a trapped battle.
+	elseif sys.stringContains(message, "You failed to run away!")
+	then
+		self.canRun = true
+
 	--restrain running
 	elseif sys.stringContains(message, "$CantRun")				--in case resource folder was missing
 		or sys.stringContains(message, "You can not run away!")
+		or sys.stringContains(message, "You cannot run away!")
+		or sys.stringContains(message, "You can't run away!")
+		or sys.stringContains(message, "cannot escape")
+		or sys.stringContains(message, "can't escape")
+		or sys.stringContains(message, "Arena Trap")
+		or sys.stringContains(message, "Wrap")
+		or sys.stringContains(message, "trapped")
+		or sys.stringContains(message, "bound")
 	then
 		self.canRun = false
 

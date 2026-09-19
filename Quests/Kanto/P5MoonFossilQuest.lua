@@ -62,7 +62,7 @@ function P5MoonFossilQuest:Route3()
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(79, 21)
 	elseif not self:isTrainingOver() then
-		sys.debug("quest", "Going to train Pokemon on Route 3 until level " .. self.level .. ".")
+		self:debug("quest", "Going to train Pokemon on Route 3 until level " .. self.level .. ".")
 		return moveToRectangle(79, 38, 85, 38)
 	else
 		sys.debug("quest", "Going to Mt. Moon.")
