@@ -31,6 +31,12 @@ function FromLittlerootToWoodsQuest:new()
 	return Quest.new(FromLittlerootToWoodsQuest, name, description, level, dialogs)
 end
 
+-- The Birch rescue encounter is exposed as a wild battle by the client, but
+-- it is required to advance this story quest.
+function FromLittlerootToWoodsQuest:isRequiredStoryBattle()
+	return getMapName() == "Lab Littleroot Town" and isWildBattle()
+end
+
 function FromLittlerootToWoodsQuest:isDoable()
 	if getMapName() == "Route 104" and game.inRectangle(2, 0, 74, 54) then
 		return false

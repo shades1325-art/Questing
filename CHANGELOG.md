@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-19 (Hoenn Littleroot rescue battle)
+
+- Fight the required Birch rescue encounter at Lab Littleroot Town even
+  though the client reports Poochyena as a wild battle.
+- Keep the normal Rainbow Badge wild-battle run behavior for optional
+  encounters.
+
 ## 2026-09-19 (Charmander hero progression)
 
 - Use only Charmander, Charmeleon, or Charizard for battle and level-cap

@@ -117,6 +117,13 @@ function Quest:isGroundOrWaterWildBattle()
 	return false
 end
 
+-- Some scripted story encounters are reported by the client as wild battles.
+-- Individual quests can override this hook when the encounter must be fought
+-- instead of being handled by the normal wild-battle policy.
+function Quest:isRequiredStoryBattle()
+	return false
+end
+
 function Quest:shouldHealAtPokecenter()
 	if self:isHeroOnlyMode() then
 		local heroPokemonId = self:getHeroPokemonIndex()
@@ -971,6 +978,11 @@ function Quest:battle()
 		return true
 	end
 
+	if self:isRequiredStoryBattle() then
+		sys.debug("fighting team", "Required story battle: attacking instead of running.")
+		return attack() or useAnyMove()
+	end
+
 	if self:isHeroOnlyMode() then
 		local heroPokemonId = self:getHeroPokemonIndex()
 		if self:isGroundOrWaterWildBattle()
@@ -1010,7 +1022,7 @@ function Quest:battle()
 	-- Once the Rainbow Badge is obtained, do not inspect the active
 	-- opponent/party state for wild encounters.  The battle callback can go
 	-- straight to the existing Lua run action instead.
-	if hasItem("Rainbow Badge") and isWildBattle() then
+	if hasItem("Rainbow Badge") and isWildBattle() and not self:isRequiredStoryBattle() then
 		sys.debug("fighting team", "Rainbow Badge complete: running from wild battle.")
 		return run()
 	end
