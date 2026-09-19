@@ -949,14 +949,20 @@ function Quest:handlePreRainbowCharmanderPathSafety()
 
 	self.heroHealRequested = true
 
+	-- A relog from an NPC battle reconnects on the same map/tile.  The NPC
+	-- can still be reported by getActiveBattlers() during the first path tick,
+	-- so try to leave the area before applying the NPC relog fallback.  The
+	-- previous order relogged again forever and never reached this action.
+	if getItemQuantity("Escape Rope") > 0 then
+		sys.debug("quest", "Hero HP/PP is unsafe; using Escape Rope to reach a Pokecenter.")
+		if useItem("Escape Rope") then
+			return true
+		end
+	end
+
 	if self:hasActiveBattleNpc() then
 		relog(0, "Relogging before NPC encounter: Charmander HP/PP is unsafe.")
 		return true
-	end
-
-	if getItemQuantity("Escape Rope") > 0 then
-		sys.debug("quest", "Hero HP/PP is unsafe; using Escape Rope to reach a Pokecenter.")
-		return useItem("Escape Rope")
 	end
 
 	if noUsablePP then
