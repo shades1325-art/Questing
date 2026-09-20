@@ -155,24 +155,14 @@ function P13RocketCeladonQuest:talkToGiovanni()
 	return talkToNpcOnCell(18, 15)
 end
 
--- After Charizard faints, try the remaining party slots in their displayed
--- order.  The party is intentionally dynamic: a borrowed team may contain
--- fewer than six Pokemon.
+-- Giovanni's superboss battle does not allow items. Attack with the current
+-- Pokemon first, even when Charizard in slot 1 has fainted. Only rotate when
+-- attack() cannot act; otherwise healthy backups switch back and forth.
+-- The existing party fallbacks support any party size. Recovery items are
+-- reserved for the overworld after the battle.
 function P13RocketCeladonQuest:battle()
 	if not self:isRequiredStoryBattle() then
 		return Quest.battle(self)
-	end
-
-	local heroPokemonId = self:getHeroPokemonIndex()
-	if heroPokemonId ~= nil and getPokemonHealth(heroPokemonId) <= 0 and self.canSwitch then
-		local lastPokemonId = math.min(getTeamSize(), 6)
-		for pokemonId = 2, lastPokemonId do
-			if pokemonId ~= heroPokemonId and getPokemonHealth(pokemonId) > 0 then
-				if sendPokemon(pokemonId) then
-					return true
-				end
-			end
-		end
 	end
 
 	return attack()

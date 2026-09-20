@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-20 (Giovanni superboss battle rotation)
+
+- Attack with each active Pokemon before trying the existing party fallbacks.
+  A fainted Charizard in slot 1 no longer makes healthy backups switch back
+  and forth without attacking.
+- Do not use battle items against Giovanni; leave existing supply purchases
+  and post-battle overworld recovery unchanged.
+- Add offline regression coverage for parties of 1-6 Pokemon, fainted and
+  PP-exhausted members, and normal wild-battle delegation.
+
 ## 2026-09-20 (Buy Giovanni recovery supplies before mission)
 
 - Prepare 2 Revives and 8 Lemonades before accepting the Celadon mission.
