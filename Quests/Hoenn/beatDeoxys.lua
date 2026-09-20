@@ -42,11 +42,10 @@ function beatDeoxys:isDoable()
 end
 
 function beatDeoxys:isDone()
-	if hasItem("Rain Badge") and getMapName() == "Sootopolis City Gym B1F" then
-		return true
-	else
-		return false
-	end
+	-- Wallace's badge is the objective.  Requiring a specific gym-floor map
+	-- left the quest selected after the battle when the server kept the player
+	-- on another gym tile, so its post-badge handler returned no action.
+	return hasItem("Rain Badge")
 end
 
 -- This quest requires a fully restored team before the long Sky Pillar/Moon

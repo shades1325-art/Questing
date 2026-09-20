@@ -62,6 +62,17 @@ function e4HoennQuest:isDone()
 	end
 end
 
+-- E4 preparation needs HP/PP restored, not every party slot to be
+-- considered offensively usable.  The generic needPokecenter() check can
+-- stay true for a healthy utility-only or PP-exhausted slot and loop between
+-- Sootopolis City and its Pokecenter.
+function e4HoennQuest:needsStoryHealing()
+	if self:isHeroOnlyMode() then
+		return self:needPokecenter()
+	end
+	return not game.isTeamFullyHealed()
+end
+
 function e4HoennQuest:buyReviveItems() --return false if all items are on the bag (32x Revives 32x HyperPotions)
 	if getItemQuantity("Revive") < self.qnt_revive or getItemQuantity("Hyper Potion") < self.qnt_hyperpot then
 		if not isShopOpen() then
@@ -114,7 +125,7 @@ function e4HoennQuest:SootopolisCityGym1F()
 end
 
 function e4HoennQuest:SootopolisCity()
-	if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Sootopolis City" then
+	if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokecenter Sootopolis City" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(79, 56)
 	elseif not hasItem("HM07 - Waterfall") and hasItem("Rain Badge") then
@@ -215,7 +226,7 @@ end
 function e4HoennQuest:EverGrandeCity()
 	-- bottom part
 	if game.inRectangle(0, 55, 56, 118) then
-		if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Ever Grande City" then
+		if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokecenter Ever Grande City" then
 			sys.debug("quest", "Going to heal Pokemon.")
 			return moveToCell(45, 64)
 
@@ -235,7 +246,7 @@ function e4HoennQuest:EverGrandeCity()
 			sys.debug("quest", "Going to fight Wally.")
 			return talkToNpcOnCell(30, 35)
 
-		elseif self:needPokecenter() or self.registeredPokecenter ~= "Pokemon League Hoenn" then
+		elseif self:needsStoryHealing() or self.registeredPokecenter ~= "Pokemon League Hoenn" then
 			sys.debug("quest", "Going to heal Pokemon.")
 			return moveToCell(31, 9)
 
@@ -258,7 +269,7 @@ end
 function e4HoennQuest:VictoryRoadHoenn1F()
 	-- top part
 	if game.inRectangle(33, 5, 49, 14) then
-		if self:needPokecenter() or self.registeredPokecenter ~= "Pokemon League Hoenn" then
+		if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokemon League Hoenn" then
 			sys.debug("quest", "Going to heal Pokemon.")
 			return moveToCell(46, 10)
 
@@ -311,7 +322,7 @@ function e4HoennQuest:PokemonLeagueHoenn()
 		--end
 
 	-- heal part
-	if self:needPokecenter() or not game.isTeamFullyHealed() then
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(4, 22)
 
