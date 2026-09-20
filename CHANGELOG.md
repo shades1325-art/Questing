@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-20 (Buy Giovanni recovery supplies before mission)
+
+- Prepare 2 Revives and 8 Lemonades before accepting the Celadon mission.
+- Keep the existing post-Giovanni recovery fallback for accounts that already
+  accepted the mission before supplies were purchased.
+
 ## 2026-09-20 (Celadon Giovanni recovery)
 
 - Treat the Celadon Rocket Hideout Giovanni encounter as a required story

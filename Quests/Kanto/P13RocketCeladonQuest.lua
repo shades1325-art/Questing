@@ -76,6 +76,7 @@ function P13RocketCeladonQuest:new()
 
 	o.checkedForBestPokemon = false
 	o.giovanniBattlePending = false
+	o.giovanniPreMissionSuppliesPending = false
 	o.giovanniPostBattlePreparationPending = false
 	o.giovanniPostBattlePreparationComplete = false
 	o.giovanniSuppliesPurchased = false
@@ -86,7 +87,9 @@ end
 function P13RocketCeladonQuest:isDoable()
 	if self:hasMap() then
 		if getMapName() == "Celadon City" then 
-			return isNpcOnCell(48,34) or self:needsGiovanniPostBattlePreparation()
+			return isNpcOnCell(48,34)
+				or self.giovanniPreMissionSuppliesPending
+				or self:needsGiovanniPostBattlePreparation()
 		else
 			return true
 		end
@@ -95,6 +98,9 @@ function P13RocketCeladonQuest:isDoable()
 end
 
 function P13RocketCeladonQuest:isDone()
+	if self.giovanniPreMissionSuppliesPending then
+		return false
+	end
 	if self.giovanniBattlePending then
 		return false
 	end
@@ -144,7 +150,7 @@ function P13RocketCeladonQuest:talkToGiovanni()
 	self.giovanniBattlePending = true
 	self.giovanniPostBattlePreparationPending = false
 	self.giovanniPostBattlePreparationComplete = false
-	self.giovanniSuppliesPurchased = false
+	self.giovanniSuppliesPurchased = self:hasGiovanniSupplies()
 	self.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
 	return talkToNpcOnCell(18, 15)
 end
@@ -181,7 +187,7 @@ function P13RocketCeladonQuest:battleMessage(message)
 		self.giovanniBattlePending = false
 		self.giovanniPostBattlePreparationPending = true
 		self.giovanniPostBattlePreparationComplete = false
-		self.giovanniSuppliesPurchased = false
+		self.giovanniSuppliesPurchased = self:hasGiovanniSupplies()
 		self.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
 		sys.debug("quest", "Giovanni defeated; preparing Revives and Lemonade for the party.")
 	elseif self.giovanniBattlePending and sys.stringContains(message, "black out") then
@@ -202,18 +208,61 @@ function P13RocketCeladonQuest:partyNeedsGiovanniRecovery()
 	return false
 end
 
+function P13RocketCeladonQuest:hasGiovanniSupplies()
+	return getItemQuantity("Revive") >= GIOVANNI_REVIVE_TARGET
+		and getItemQuantity("Lemonade") >= GIOVANNI_LEMONADE_TARGET
+end
+
 function P13RocketCeladonQuest:needsGiovanniPostBattlePreparation()
-	return getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET
-		or getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET
+	return not self:hasGiovanniSupplies()
 		or self:partyNeedsGiovanniRecovery()
 end
 
 function P13RocketCeladonQuest:needsGiovanniSupplies()
-	if not self.giovanniPostBattlePreparationPending or self.giovanniSuppliesPurchased then
+	if self.giovanniSuppliesPurchased then
 		return false
 	end
-	return getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET
-		or getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET
+	if not self.giovanniPreMissionSuppliesPending
+		and not self.giovanniPostBattlePreparationPending
+	then
+		return false
+	end
+	return not self:hasGiovanniSupplies()
+end
+
+-- The Celadon mission-giver is the point at which the live story accepts the
+-- Rocket mission (the account may display that NPC as Sergeant Rick).  Buy
+-- the Giovanni recovery supplies before talking to that NPC so the account
+-- does not enter the hideout without its required Revives and Lemonade.
+function P13RocketCeladonQuest:handlePreMissionGiovanniSupplies()
+	if self.giovanniSuppliesPurchased then
+		return nil
+	end
+
+	if not self.giovanniPreMissionSuppliesPending then
+		if not isNpcOnCell(48, 34)
+			or dialogs.guardQuestAccept.state
+		then
+			return nil
+		end
+
+		if self:hasGiovanniSupplies() then
+			self.giovanniSuppliesPurchased = true
+			return nil
+		end
+
+		self.giovanniPreMissionSuppliesPending = true
+		sys.debug("quest", "Buying Revives and Lemonade before accepting the Celadon mission.")
+	end
+
+	if not self:hasGiovanniSupplies() then
+		return moveToCell(24, 20)
+	end
+
+	self.giovanniPreMissionSuppliesPending = false
+	self.giovanniSuppliesPurchased = true
+	sys.debug("quest", "Giovanni supplies ready before mission acceptance.")
+	return moveToCell(52, 19)
 end
 
 function P13RocketCeladonQuest:buyGiovanniSupplies()
@@ -314,6 +363,11 @@ function P13RocketCeladonQuest:handleGiovanniPostBattlePreparation()
 end
 
 function P13RocketCeladonQuest:CeladonCity()
+	local preMissionSupplyAction = self:handlePreMissionGiovanniSupplies()
+	if preMissionSupplyAction ~= nil then
+		return preMissionSupplyAction
+	end
+
 	local giovanniAction = self:handleGiovanniPostBattlePreparation()
 	if giovanniAction ~= nil then
 		return giovanniAction
