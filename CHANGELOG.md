@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-20 (Celadon Giovanni recovery)
+
+- Treat the Celadon Rocket Hideout Giovanni encounter as a required story
+  battle and rotate through available party slots when Charizard faints.
+- After victory, buy up to 2 Revives and 8 Lemonades, using the existing
+  Celadon Mart floors while preserving one Lemonade for Saffron.
+- Recover the party to at least 70% HP without assuming a six-Pokémon team.
+
 ## 2026-09-20 (Story recovery and progression fixes)
 
 - Allow the Hoenn Mossdeep quest to resume in Lilycove while an orb remains

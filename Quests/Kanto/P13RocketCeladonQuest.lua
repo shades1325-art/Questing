@@ -11,6 +11,14 @@ local name		  = 'Rocket Team'
 local description = 'Celadon City Quest'
 local level = 1
 
+-- Giovanni is a required story battle.  Keep the recovery policy local to
+-- this quest so the normal shared wild-battle policy is not changed for the
+-- rest of the story.
+local GIOVANNI_REVIVE_TARGET = 2
+local GIOVANNI_LEMONADE_TARGET = 8
+local GIOVANNI_LEMONADE_RESERVE = 1 -- keep one Lemonade for the Saffron guard
+local GIOVANNI_RECOVERY_HP_PERCENT = 70
+
 local dialogs = {
 	guardQuestAccept = Dialog:new({ 
 		"do not lose",
@@ -25,6 +33,15 @@ local dialogs = {
 	}),
 	elevator_B4 = Dialog:new({ 
 		"arrived on b4",
+	}),
+	martElevatorFloor1 = Dialog:new({
+		"the first floor"
+	}),
+	martElevatorFloor2 = Dialog:new({
+		"the second floor"
+	}),
+	martElevatorFloor5 = Dialog:new({
+		"the fifth floor"
 	}),
 	passwordNeeded = Dialog:new({ 
 		"find someone with the password",
@@ -58,13 +75,18 @@ function P13RocketCeladonQuest:new()
 	o.b3f_ReceptorDone = false
 
 	o.checkedForBestPokemon = false
+	o.giovanniBattlePending = false
+	o.giovanniPostBattlePreparationPending = false
+	o.giovanniPostBattlePreparationComplete = false
+	o.giovanniSuppliesPurchased = false
+	o.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
 	return o
 end
 
 function P13RocketCeladonQuest:isDoable()
 	if self:hasMap() then
 		if getMapName() == "Celadon City" then 
-			return isNpcOnCell(48,34)
+			return isNpcOnCell(48,34) or self:needsGiovanniPostBattlePreparation()
 		else
 			return true
 		end
@@ -73,19 +95,230 @@ function P13RocketCeladonQuest:isDoable()
 end
 
 function P13RocketCeladonQuest:isDone()
+	if self.giovanniBattlePending then
+		return false
+	end
 	if getMapName() == "Celadon City" and not isNpcOnCell(48,34) then
+		-- Recover the post-battle intent after a script reload if the Rocket
+		-- NPC has already disappeared but the required supplies/recovery were
+		-- not completed yet.
+		if not self.giovanniPostBattlePreparationPending
+			and not self.giovanniPostBattlePreparationComplete
+			and self:needsGiovanniPostBattlePreparation()
+		then
+			self.giovanniPostBattlePreparationPending = true
+			self.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
+			return false
+		end
+		return not self.giovanniPostBattlePreparationPending
+			or self.giovanniPostBattlePreparationComplete
+	end
+	return false
+end
+
+function P13RocketCeladonQuest:isPersistentCompletionValid()
+	-- Older flag files may already contain Rocket Team as completed before the
+	-- Giovanni supply/recovery step existed.  Re-open that flag only while the
+	-- player is still in the Celadon/Saffron part of Kanto and the objective is
+	-- visibly incomplete.  Later story progression keeps the normal flag fast
+	-- path.
+	if getMapName() == "Celadon City" and not hasItem("Marsh Badge") and not hasItem("Soul Badge") then
+		return not isNpcOnCell(48, 34)
+			and not self:needsGiovanniPostBattlePreparation()
+	end
+	return true
+end
+
+-- The final Rocket Hideout encounter is an NPC/story battle and must not be
+-- handled by the post-Rainbow wild-battle run policy.  The map guard also
+-- keeps the battle required if the script is reloaded between the NPC dialog
+-- and the battle callback.
+function P13RocketCeladonQuest:isRequiredStoryBattle()
+	if self.giovanniBattlePending then
 		return true
-	else
+	end
+	return getMapName() == "Rocket Hideout B4F" and not isWildBattle()
+end
+
+function P13RocketCeladonQuest:talkToGiovanni()
+	self.giovanniBattlePending = true
+	self.giovanniPostBattlePreparationPending = false
+	self.giovanniPostBattlePreparationComplete = false
+	self.giovanniSuppliesPurchased = false
+	self.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
+	return talkToNpcOnCell(18, 15)
+end
+
+-- After Charizard faints, try the remaining party slots in their displayed
+-- order.  The party is intentionally dynamic: a borrowed team may contain
+-- fewer than six Pokemon.
+function P13RocketCeladonQuest:battle()
+	if not self:isRequiredStoryBattle() then
+		return Quest.battle(self)
+	end
+
+	local heroPokemonId = self:getHeroPokemonIndex()
+	if heroPokemonId ~= nil and getPokemonHealth(heroPokemonId) <= 0 and self.canSwitch then
+		local lastPokemonId = math.min(getTeamSize(), 6)
+		for pokemonId = 2, lastPokemonId do
+			if pokemonId ~= heroPokemonId and getPokemonHealth(pokemonId) > 0 then
+				if sendPokemon(pokemonId) then
+					return true
+				end
+			end
+		end
+	end
+
+	return attack()
+		or sendUsablePokemon()
+		or sendAnyPokemon()
+		or useAnyMove()
+end
+
+function P13RocketCeladonQuest:battleMessage(message)
+	local result = Quest.battleMessage(self, message)
+	if self.giovanniBattlePending and sys.stringContains(message, "won the battle") then
+		self.giovanniBattlePending = false
+		self.giovanniPostBattlePreparationPending = true
+		self.giovanniPostBattlePreparationComplete = false
+		self.giovanniSuppliesPurchased = false
+		self.giovanniReviveBudget = GIOVANNI_REVIVE_TARGET
+		sys.debug("quest", "Giovanni defeated; preparing Revives and Lemonade for the party.")
+	elseif self.giovanniBattlePending and sys.stringContains(message, "black out") then
+		-- Let the normal quest path retry Giovanni after a failed battle.
+		self.giovanniBattlePending = false
+	end
+	return result
+end
+
+function P13RocketCeladonQuest:partyNeedsGiovanniRecovery()
+	for pokemonId = 1, math.min(getTeamSize(), 6) do
+		if getPokemonHealth(pokemonId) <= 0
+			or getPokemonHealthPercent(pokemonId) < GIOVANNI_RECOVERY_HP_PERCENT
+		then
+			return true
+		end
+	end
+	return false
+end
+
+function P13RocketCeladonQuest:needsGiovanniPostBattlePreparation()
+	return getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET
+		or getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET
+		or self:partyNeedsGiovanniRecovery()
+end
+
+function P13RocketCeladonQuest:needsGiovanniSupplies()
+	if not self.giovanniPostBattlePreparationPending or self.giovanniSuppliesPurchased then
 		return false
 	end
-	if hasItem("Marsh Badge") then
-		return true
-	else
-		return false
+	return getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET
+		or getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET
+end
+
+function P13RocketCeladonQuest:buyGiovanniSupplies()
+	if not isShopOpen() then
+		return talkToNpcOnCell(4, 8)
 	end
+
+	local reviveCount = getItemQuantity("Revive")
+	if reviveCount < GIOVANNI_REVIVE_TARGET then
+		local quantity = GIOVANNI_REVIVE_TARGET - reviveCount
+		return buyItem("Revive", quantity)
+	end
+	return false
+end
+
+function P13RocketCeladonQuest:buyGiovanniLemonade()
+	if not isShopOpen() then
+		return talkToNpcOnCell(12, 3)
+	end
+
+	local lemonadeCount = getItemQuantity("Lemonade")
+	if lemonadeCount < GIOVANNI_LEMONADE_TARGET then
+		local quantity = GIOVANNI_LEMONADE_TARGET - lemonadeCount
+		return buyItem("Lemonade", quantity)
+	end
+	return false
+end
+
+function P13RocketCeladonQuest:giovanniRecoveryOrder()
+	local order = {}
+	local added = {}
+	local lastPokemonId = math.min(getTeamSize(), 6)
+	local heroPokemonId = self:getHeroPokemonIndex()
+
+	local function addPokemon(pokemonId)
+		if pokemonId ~= nil
+			and pokemonId >= 1
+			and pokemonId <= lastPokemonId
+			and not added[pokemonId]
+		then
+			added[pokemonId] = true
+			table.insert(order, pokemonId)
+		end
+	end
+
+	-- Prioritize the hero, then the requested backup slots 2..6.  The final
+	-- loop covers slot 1 if a borrowed team has Charizard in another position.
+	addPokemon(heroPokemonId)
+	for pokemonId = 2, lastPokemonId do
+		addPokemon(pokemonId)
+	end
+	for pokemonId = 1, lastPokemonId do
+		addPokemon(pokemonId)
+	end
+	return order
+end
+
+function P13RocketCeladonQuest:recoverGiovanniParty()
+	for _, pokemonId in ipairs(self:giovanniRecoveryOrder()) do
+		if getPokemonHealth(pokemonId) <= 0 then
+			if self.giovanniReviveBudget > 0 and getItemQuantity("Revive") > 0 then
+				if useItemOnPokemon("Revive", pokemonId) then
+					self.giovanniReviveBudget = self.giovanniReviveBudget - 1
+					return true
+				end
+			end
+		elseif getPokemonHealthPercent(pokemonId) < GIOVANNI_RECOVERY_HP_PERCENT
+			and getItemQuantity("Lemonade") > GIOVANNI_LEMONADE_RESERVE
+		then
+			return useItemOnPokemon("Lemonade", pokemonId)
+		end
+	end
+	return false
+end
+
+function P13RocketCeladonQuest:handleGiovanniPostBattlePreparation()
+	if not self.giovanniPostBattlePreparationPending then
+		return nil
+	end
+
+	if not self.giovanniSuppliesPurchased then
+		if self:needsGiovanniSupplies() then
+			return moveToCell(24, 20)
+		end
+		self.giovanniSuppliesPurchased = true
+	end
+
+	if self:recoverGiovanniParty() then
+		return true
+	end
+
+	self.giovanniPostBattlePreparationPending = false
+	self.giovanniPostBattlePreparationComplete = true
+	sys.debug("quest", "Giovanni party recovery complete; keeping one Lemonade for Saffron.")
+	-- Return a real movement action.  QuestManager will see isDone() on the
+	-- next tick and advance without restarting the region story.
+	return moveToCell(52, 19)
 end
 
 function P13RocketCeladonQuest:CeladonCity()
+	local giovanniAction = self:handleGiovanniPostBattlePreparation()
+	if giovanniAction ~= nil then
+		return giovanniAction
+	end
+
 	if self:needPokecenter() or self:needsTeamHealingForStory() or self.registeredPokecenter ~= "Pokecenter Celadon" or self.needCutPokemonFromBoxes then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(52, 19)
@@ -117,7 +350,7 @@ function P13RocketCeladonQuest:CeladonCity()
 end
 
 function P13RocketCeladonQuest:PokecenterCeladon()
-		self:pokecenter("Celadon City")
+	return self:pokecenter("Celadon City")
 end
 
 function P13RocketCeladonQuest:Route7()
@@ -199,7 +432,7 @@ function P13RocketCeladonQuest:Route8()
 end
 
 function P13RocketCeladonQuest:CeladonMart1()
-	if self:needPokemart() then
+	if self:needsGiovanniSupplies() or self:needPokemart() then
 		return moveToCell(1, 4)
 	else
 		return moveToCell(8, 15)
@@ -207,7 +440,57 @@ function P13RocketCeladonQuest:CeladonMart1()
 end
 
 function P13RocketCeladonQuest:CeladonMart2()
-	self:pokemart()
+	if self:needsGiovanniSupplies() and getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET then
+		return self:buyGiovanniSupplies()
+	elseif self:needsGiovanniSupplies() then
+		-- Revives are sold on floor 2; Lemonade is sold on floor 6.
+		return moveToCell(9, 2)
+	end
+	return self:pokemart()
+end
+
+function P13RocketCeladonQuest:CeladonMartElevator()
+	if getItemQuantity("Revive") < GIOVANNI_REVIVE_TARGET then
+		if not dialogs.martElevatorFloor2.state then
+			pushDialogAnswer(2)
+			return talkToNpcOnCell(1, 1)
+		else
+			dialogs.martElevatorFloor2.state = false
+			return moveToCell(2, 5)
+		end
+	elseif getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET then
+		if not dialogs.martElevatorFloor5.state then
+			pushDialogAnswer(5)
+			return talkToNpcOnCell(1, 1)
+		else
+			dialogs.martElevatorFloor5.state = false
+			return moveToCell(2, 5)
+		end
+	else
+		if not dialogs.martElevatorFloor1.state then
+			pushDialogAnswer(1)
+			return talkToNpcOnCell(1, 1)
+		else
+			dialogs.martElevatorFloor1.state = false
+			return moveToCell(2, 5)
+		end
+	end
+end
+
+function P13RocketCeladonQuest:CeladonMart5()
+	if getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET then
+		return moveToCell(16, 4)
+	else
+		return moveToCell(9, 2)
+	end
+end
+
+function P13RocketCeladonQuest:CeladonMart6()
+	if getItemQuantity("Lemonade") < GIOVANNI_LEMONADE_TARGET then
+		return self:buyGiovanniLemonade()
+	else
+		return moveToCell(15, 8)
+	end
 end
 
 function P13RocketCeladonQuest:CeladonCityGameCorner()
@@ -381,7 +664,7 @@ function P13RocketCeladonQuest:RocketHideoutB4F()
 		elseif isNpcOnCell(18, 6) then
 			return talkToNpcOnCell(18, 6)
 		elseif dialogs.releaseEeveeDone.state then
-			return talkToNpcOnCell(18, 15)
+				return self:talkToGiovanni()
 		elseif not self.b4f_ReceptorDone then
 			if not self.Receptor5check then -- Receptor5check
 				if not dialogs.receptorEmpty.state then
@@ -419,14 +702,14 @@ function P13RocketCeladonQuest:RocketHideoutB4F()
 				self.b4f_ReceptorDone = true
 				return
 			end
-		else
-			return talkToNpcOnCell(18, 15)
+	else
+			return self:talkToGiovanni()
 		end
 	elseif game.inRectangle(14, 16, 22, 26) or game.inRectangle(1, 21, 13, 26) then -- Before HiddenDoor
-		if isNpcOnCell(19, 4) or isNpcOnCell(18, 6) then
-			return talkToNpcOnCell(18, 15)
+	if isNpcOnCell(19, 4) or isNpcOnCell(18, 6) then
+			return self:talkToGiovanni()
 		elseif not dialogs.releaseEeveeDone.state and not self.b4f_ReceptorDone then
-			return talkToNpcOnCell(18, 15)
+			return self:talkToGiovanni()
 		elseif self.b4f_ReceptorDone then
 			if not self.Receptor9check and not dialogs.releaseEeveeDone.state then -- Receptor7check
 				if not dialogs.receptorEmpty.state then
