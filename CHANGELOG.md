@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-20 (Hoenn transport hand-off)
+- Added the post-E4 Hoenn transport quest as a reusable Lua QuestManager module.
+- Added account-scoped state persistence, New Mauville objectives, the three-PC Transmat tour, and Lilycove hand-off to the existing Sinnoh quest.
+- Resynchronized interrupted transport state at non-Mauville Pokecenters instead of treating a waypoint such as Oldale as Wattson's location.
+- Corrected the Oldale-to-Route 103 exit used when resuming the Mauville transport route.
+- Retried interrupted route-link transitions after reconnects instead of stopping on a persisted waiting step.
+
 ## 2026-09-20 (Giovanni superboss battle rotation)
 
 - Attack with each active Pokemon before trying the existing party fallbacks.

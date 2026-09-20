@@ -114,6 +114,7 @@ local ToMossdeepCity			 = require('Quests/Hoenn/ToMossdeepCity')
 local meetKyogre			     = require('Quests/Hoenn/meetKyogre')
 local beatDeoxys				 = require('Quests/Hoenn/beatDeoxys')
 local e4Hoenn					 = require('Quests/Hoenn/e4Hoenn')
+local HoennTransportQuest		 = require('Quests/Hoenn/HoennTransportQuest')
 local toSinnoh					 = require('Quests/Hoenn/toSinnoh')
 
 --Sinnoh
@@ -193,6 +194,7 @@ local quests = {
 	meetKyogre:new(),
 	beatDeoxys:new(),
 	e4Hoenn:new(),
+	HoennTransportQuest:new(),
 	toSinnoh:new(),
 	
 	--SinnohQuest
