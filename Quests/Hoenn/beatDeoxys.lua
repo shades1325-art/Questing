@@ -29,7 +29,6 @@ local beatDeoxys = Quest:new()
 
 function beatDeoxys:new()
 	local o = Quest.new(beatDeoxys, name, description, level, dialogs)
-	o.checkedForBestPokemon = false
 	o.deoxysBeaten = false
 	o.relogged = false
 	return o
@@ -48,6 +47,18 @@ function beatDeoxys:isDone()
 	else
 		return false
 	end
+end
+
+-- This quest requires a fully restored team before the long Sky Pillar/Moon
+-- route.  The generic needPokecenter() check is intentionally stricter and
+-- can remain true when a healthy party member has no usable offensive move;
+-- that caused a healthy team to bounce between Pacifidlog Town and its PC.
+-- Preserve the pre-Rainbow hero-only policy when it is still active.
+function beatDeoxys:needsStoryHealing()
+	if self:isHeroOnlyMode() then
+		return self:needPokecenter()
+	end
+	return not game.isTeamFullyHealed()
 end
 
 function beatDeoxys:Route128()
@@ -71,7 +82,7 @@ function beatDeoxys:Route127()
 end
 
 function beatDeoxys:MossdeepCity()
-	if self:needPokecenter() then
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(36, 21)
 	else
@@ -133,7 +144,7 @@ function beatDeoxys:SootopolisCityUnderwater()
 end
 
 function beatDeoxys:SootopolisCity()
-	if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Sootopolis City" then
+	if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokecenter Sootopolis City" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(79, 56)
 	elseif isNpcOnCell(48, 68) and not dialogs.goToSkyPillar.state then
@@ -174,7 +185,7 @@ function beatDeoxys:Route130()
 end
 
 function beatDeoxys:Route131()
-	if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Pacifidlog Town" then
+	if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokecenter Pacifidlog Town" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(0, 30)
 	else
@@ -184,7 +195,7 @@ function beatDeoxys:Route131()
 end
 
 function beatDeoxys:PacifidlogTown()
-	if self:needPokecenter() or self.registeredPokecenter ~= "Pokecenter Pacifidlog Town" then
+	if self:needsStoryHealing() or self.registeredPokecenter ~= "Pokecenter Pacifidlog Town" then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(19, 12)
 	else
@@ -194,16 +205,12 @@ function beatDeoxys:PacifidlogTown()
 end
 
 function beatDeoxys:PokecenterPacifidlogTown()
-	if not self.checkedForBestPokemon then
-		self.checkedForBestPokemon = true
-	else
-		return self:pokecenter("Pacifidlog Town")
-	end
+	return self:pokecenter("Pacifidlog Town")
 end
 
 function beatDeoxys:SkyPillarEntrance()
 	if game.inRectangle(9, 31, 47, 49) then
-		if self:needPokecenter() then 
+		if self:needsStoryHealing() then
 			sys.debug("quest", "Going to heal Pokemon.")
 			return moveToCell(26, 49)
 		else
@@ -214,7 +221,7 @@ function beatDeoxys:SkyPillarEntrance()
 		if isNpcOnCell(27, 7) then	
 			sys.debug("quest", "Going to talk to NPC.")
 			return talkToNpcOnCell(27, 7)
-		elseif self:needPokecenter() then
+		elseif self:needsStoryHealing() then
 			sys.debug("quest", "Going to heal Pokemon.")
 			return moveToCell(35, 23)
 		else
@@ -225,7 +232,7 @@ function beatDeoxys:SkyPillarEntrance()
 end
 
 function beatDeoxys:SkyPillarEntranceCave1F()
-	if self:needPokecenter() then 
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return talkToNpcOnCell(7, 17)
 	else
@@ -235,7 +242,7 @@ function beatDeoxys:SkyPillarEntranceCave1F()
 end
 
 function beatDeoxys:SkyPillar1F()
-	if self:needPokecenter() then	
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(8, 13)
 	else
@@ -245,7 +252,7 @@ function beatDeoxys:SkyPillar1F()
 end
 
 function beatDeoxys:SkyPillar2F()
-	if self:needPokecenter() then	
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(13, 7)
 	else
@@ -255,7 +262,7 @@ function beatDeoxys:SkyPillar2F()
 end
 
 function beatDeoxys:SkyPillar3F()
-	if self:needPokecenter() then	
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(7, 6)
 	else
@@ -265,7 +272,7 @@ function beatDeoxys:SkyPillar3F()
 end
 
 function beatDeoxys:SkyPillar4F()
-	if self:needPokecenter() then	
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(3, 7)
 	else
@@ -275,7 +282,7 @@ function beatDeoxys:SkyPillar4F()
 end
 
 function beatDeoxys:SkyPillar5F()
-	if self:needPokecenter() then	
+	if self:needsStoryHealing() then
 		sys.debug("quest", "Going to heal Pokemon.")
 		return moveToCell(8, 13)
 	elseif not self:isTrainingOver() then
