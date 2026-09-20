@@ -1,11 +1,25 @@
 # Changelog
 
 ## 2026-09-20 (Hoenn transport hand-off)
+- Fixed indefinite remote-object waits: reconcile an already-open gate from repeated populated live NPC snapshots, persist recovery, and resume the same north-side destination after wild battles. Empty snapshots and old passage flags do not imply completion. Failed paths/missing responses now have an eight-second diagnostic timeout instead of silently renewing waits forever. Added offline regression tests; optional item discovery remains disabled.
 - Added the post-E4 Hoenn transport quest as a reusable Lua QuestManager module.
 - Added account-scoped state persistence, New Mauville objectives, the three-PC Transmat tour, and Lilycove hand-off to the existing Sinnoh quest.
 - Resynchronized interrupted transport state at non-Mauville Pokecenters instead of treating a waypoint such as Oldale as Wattson's location.
 - Corrected the Oldale-to-Route 103 exit used when resuming the Mauville transport route.
 - Retried interrupted route-link transitions after reconnects instead of stopping on a persisted waiting step.
+- Added the required Shelly conversation at New Mauville Entrance cell `(12, 7)` before entering New Mauville.
+- Added the follow-up Wattson conversation at New Mauville Entrance cell `(13, 7)` before entering the facility.
+- Split Route 110 navigation into its A/B/C map transitions so the transport quest can reach Route 110_C, New Mauville Entrance, and New Mauville without issuing a coordinate from the wrong map.
+- Expanded New Mauville searches to the lower map and added Aqua/Magma Grunt fallback interactions with per-cell attempt tracking for the blocked path at `(41, 58)`/`(41, 59)`.
+- Added the deterministic south passage sequence: challenge the grunt at `(21, 55)`, approach the gate at `(21, 40)`/`(22, 40)`, then resume in the upper New Mauville area.  The sequence also resumes correctly after the remote control is found.
+- Corrected the south passage sequence to force the `(21, 55)` NPC interaction first, wait for the server gate update, and target the safe cell north of the gate instead of repeatedly targeting `(21, 40)`/`(22, 40)`.
+- Added recovery for stale south-grunt battle state: retry the type-157 Aqua Grunt interaction after a bounded timeout instead of freezing in `await_grunt`.
+- Recognize the type-157 grunt's remote-control/electro-barrier dialogue as completion of the fixed-cell interaction, preventing repeated NPC conversations when no battle packet is opened.
+- After the south passage is complete, transition from the initial grunt sweep to the existing remote-control objective so wild-battle recovery cannot restart the lower-map gate sequence.
+- Added bounded remote-control response handling so an interrupted item interaction waits and retries the known objective instead of starting repeated New Mauville search sweeps after wild battles.
+- Disabled generic New Mauville discoverable-item scanning; the transport quest now targets only the fixed remote-control object at `(7, 45)`.
+- Avoided pathing directly onto the blocked remote-control object; when its NPC snapshot is delayed, approach the adjacent walkable cell `(6, 45)` and wait for the interaction target.
+- Changed the New Mauville entrance movement to use the `(12, 4)`–`(13, 4)` rectangle after Wattson is handled.
 
 ## 2026-09-20 (Giovanni superboss battle rotation)
 

@@ -48,6 +48,7 @@ local function newState()
 		adminsDefeated = 0,
 		keyFound = false,
 		keyAttempt = "",
+		keyAttemptAt = 0,
 		keySweep = 1,
 		newMauvilleSweep = 1,
 		plusle = false,
@@ -59,6 +60,12 @@ local function newState()
 		computerAttemptedAt = 0,
 		installResult = "",
 		pendingBattle = false,
+		gruntAttempts = {},
+		southPassageStep = "find_grunt",
+		southPassageComplete = false,
+		southPassageAttemptedAt = 0,
+		entranceShellyTalked = false,
+		entranceWattsonTalked = false,
 		divePrepared = 0,
 	}
 end
@@ -88,6 +95,7 @@ local function loadState()
 			elseif key == "adminsDefeated" then state.adminsDefeated = tonumber(value) or 0
 			elseif key == "keyFound" then state.keyFound = boolValue(value)
 			elseif key == "keyAttempt" then state.keyAttempt = value
+			elseif key == "keyAttemptAt" then state.keyAttemptAt = tonumber(value) or 0
 			elseif key == "keySweep" then state.keySweep = tonumber(value) or 1
 			elseif key == "newMauvilleSweep" then state.newMauvilleSweep = tonumber(value) or 1
 			elseif key == "plusle" then state.plusle = boolValue(value)
@@ -99,6 +107,15 @@ local function loadState()
 			elseif key == "computerAttemptedAt" then state.computerAttemptedAt = tonumber(value) or 0
 			elseif key == "installResult" then state.installResult = value
 			elseif key == "pendingBattle" then state.pendingBattle = boolValue(value)
+			elseif key == "gruntAttempts" then
+				for attempt in string.gmatch(value, "[^,]+") do
+					state.gruntAttempts[attempt] = true
+				end
+			elseif key == "southPassageStep" then state.southPassageStep = value
+			elseif key == "southPassageComplete" then state.southPassageComplete = boolValue(value)
+			elseif key == "southPassageAttemptedAt" then state.southPassageAttemptedAt = tonumber(value) or 0
+			elseif key == "entranceShellyTalked" then state.entranceShellyTalked = boolValue(value)
+			elseif key == "entranceWattsonTalked" then state.entranceWattsonTalked = boolValue(value)
 			elseif key == "divePrepared" then state.divePrepared = tonumber(value) or 0
 			end
 		end
@@ -131,6 +148,7 @@ local function saveState(state)
 		"adminsDefeated=" .. tostring(state.adminsDefeated or 0),
 		"keyFound=" .. (state.keyFound and "1" or "0"),
 		"keyAttempt=" .. tostring(state.keyAttempt or ""),
+		"keyAttemptAt=" .. tostring(state.keyAttemptAt or 0),
 		"keySweep=" .. tostring(state.keySweep or 1),
 		"newMauvilleSweep=" .. tostring(state.newMauvilleSweep or 1),
 		"plusle=" .. (state.plusle and "1" or "0"),
@@ -142,6 +160,21 @@ local function saveState(state)
 		"computerAttemptedAt=" .. tostring(state.computerAttemptedAt or 0),
 		"installResult=" .. tostring(state.installResult or ""),
 		"pendingBattle=" .. (state.pendingBattle and "1" or "0"),
+		"gruntAttempts=" .. (function()
+			local attempts = {}
+			for key, attempted in pairs(state.gruntAttempts or {}) do
+				if attempted then
+					attempts[#attempts + 1] = key
+				end
+			end
+			table.sort(attempts)
+			return table.concat(attempts, ",")
+		end)(),
+		"southPassageStep=" .. tostring(state.southPassageStep or "find_grunt"),
+		"southPassageComplete=" .. (state.southPassageComplete and "1" or "0"),
+		"southPassageAttemptedAt=" .. tostring(state.southPassageAttemptedAt or 0),
+		"entranceShellyTalked=" .. (state.entranceShellyTalked and "1" or "0"),
+		"entranceWattsonTalked=" .. (state.entranceWattsonTalked and "1" or "0"),
 		"divePrepared=" .. tostring(state.divePrepared or 0),
 	}
 	logToFile(accountStateFile(), lines, true)
@@ -159,7 +192,7 @@ local function mapFunctionKey(mapName)
 	return key
 end
 
-local function step(mapNames, x, y)
+local function step(mapNames, x, y, maxX, maxY)
 	if type(mapNames) == "string" then
 		mapNames = {mapNames}
 	end
@@ -177,7 +210,18 @@ local function step(mapNames, x, y)
 		keys = functionKeys,
 		x = x,
 		y = y,
+		rectangle = maxX ~= nil and {x, y, maxX, maxY} or nil,
 	}
+end
+
+local function moveToRouteStep(routeStep)
+	if routeStep.rectangle ~= nil then
+		return moveToRectangle(
+			routeStep.rectangle[1], routeStep.rectangle[2],
+			routeStep.rectangle[3], routeStep.rectangle[4]
+		)
+	end
+	return moveToCell(routeStep.x, routeStep.y)
 end
 
 local function concatRoutes(...)
@@ -241,7 +285,8 @@ routes.to_mauville = {
 	-- reverse link on Route 103_A and is not a reachable Oldale exit.
 	step("Oldale Town", 23, 0),
 	step({"Route 103", "Route 103_A", "Route 103_B"}, 100, 19),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 	step("Mauville City", 28, 13),
 }
@@ -251,15 +296,17 @@ routes.to_new_mauville = {
 	step("Pokecenter Mauville City", 8, 22),
 	step("Mauville City", 21, 30),
 	step("Mauville City Stop House 1", 3, 12),
-	step({"Route 110", "Route 110_A", "Route 110_C"}, 56, 33),
-	step("New Mauville Entrance", 12, 4),
+	step("Route 110_A", 52, 36),
+	step("Route 110_C", 56, 33, 57, 33),
+	step("New Mauville Entrance", 12, 4, 13, 4),
 }
 
 -- Return from New Mauville to the first PC after finding Plusle and Minun.
 routes.to_mauville_pc = {
 	step("New Mauville", 47, 53),
 	step("New Mauville Entrance", 12, 15),
-	step({"Route 110", "Route 110_A", "Route 110_C"}, 24, 3),
+	step("Route 110_C", 20, 30, 22, 30),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 	step("Mauville City", 28, 13),
 }
@@ -269,7 +316,8 @@ routes.to_mauville_pc = {
 routes.to_lilycove = {
 	step("New Mauville", 47, 53),
 	step("New Mauville Entrance", 12, 15),
-	step({"Route 110", "Route 110_A", "Route 110_C"}, 24, 3),
+	step("Route 110_C", 20, 30, 22, 30),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 	step("Mauville City", 48, 17),
 	step("Mauville City Stop House 4", 10, 6),
@@ -286,7 +334,8 @@ routes.center_1 = { -- Mauville -> Slateport
 	step("Pokecenter Mauville City", 8, 22),
 	step("Mauville City", 21, 30),
 	step("Mauville City Stop House 1", 3, 12),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 23, 140),
+	step("Route 110_A", 41, 60, 41, 62),
+	step("Route 110_B", 23, 140, 25, 140),
 	step("Slateport City", 32, 25),
 }
 routes.center_2 = { -- Slateport -> Dewford
@@ -420,7 +469,8 @@ routes.center_14 = { -- Ever Grande -> Oldale
 	step("Mauville City Stop House 4", 0, 6),
 	step("Mauville City", 21, 30),
 	step("Mauville City Stop House 1", 3, 12),
-	step({"Route 110", "Route 110_A", "Route 110_C"}, 0, 98),
+	step("Route 110_A", 41, 60, 41, 62),
+	step("Route 110_B", 0, 98, 0, 100),
 	step({"Route 103", "Route 103_A", "Route 103_B"}, 25, 35),
 	step("Oldale Town", 16, 26),
 }
@@ -428,7 +478,8 @@ routes.center_15 = { -- Oldale -> Mauville (tour wrap)
 	step("Pokecenter Oldale Town", 8, 22),
 	step("Oldale Town", 23, 0),
 	step({"Route 103", "Route 103_A", "Route 103_B"}, 100, 19),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 	step("Mauville City", 28, 13),
 }
@@ -438,8 +489,9 @@ routes.center_15 = { -- Oldale -> Mauville (tour wrap)
 local mauvilleToNew = {
 	step("Mauville City", 21, 30),
 	step("Mauville City Stop House 1", 3, 12),
-	step({"Route 110", "Route 110_A", "Route 110_C"}, 56, 33),
-	step("New Mauville Entrance", 12, 4),
+	step("Route 110_A", 52, 36),
+	step("Route 110_C", 56, 33, 57, 33),
+	step("New Mauville Entrance", 12, 4, 13, 4),
 }
 
 routes.return_1 = concatRoutes({
@@ -450,7 +502,8 @@ routes.return_2 = concatRoutes({
 	step("Transmat Station", 9, 10),
 	step("Pokecenter Slateport", 8, 22),
 	step("Slateport City", 30, 0),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 }, mauvilleToNew)
 routes.return_3 = concatRoutes({
@@ -461,7 +514,8 @@ routes.return_3 = concatRoutes({
 	step("Route 108", 0, 57),
 	step("Route 109", 33, 0),
 	step("Slateport City", 30, 0),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 }, mauvilleToNew)
 routes.return_4 = concatRoutes({
@@ -476,7 +530,8 @@ routes.return_4 = concatRoutes({
 	step("Route 108", 0, 57),
 	step("Route 109", 33, 0),
 	step("Slateport City", 30, 0),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 }, mauvilleToNew)
 routes.return_5 = concatRoutes({
@@ -495,7 +550,8 @@ routes.return_5 = concatRoutes({
 	step("Route 108", 0, 57),
 	step("Route 109", 33, 0),
 	step("Slateport City", 30, 0),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 }, mauvilleToNew)
 routes.return_6 = concatRoutes({
@@ -632,7 +688,8 @@ routes.return_15 = concatRoutes({
 	step("Pokecenter Oldale Town", 8, 22),
 	step("Oldale Town", 23, 0),
 	step({"Route 103", "Route 103_A", "Route 103_B"}, 100, 19),
-	step({"Route 110", "Route 110_A", "Route 110_B"}, 24, 3),
+	step({"Route 110", "Route 110_B"}, 39, 60, 39, 62),
+	step("Route 110_A", 24, 3, 25, 3),
 	step("Mauville City Stop House 1", 3, 2),
 }, mauvilleToNew)
 
@@ -641,7 +698,11 @@ local newMauvilleSearchRectangles = {
 	{16, 1, 32, 15},
 	{1, 16, 15, 35},
 	{16, 16, 32, 35},
-	{33, 1, 47, 53},
+	{33, 1, 60, 35},
+	{1, 36, 32, 53},
+	{33, 36, 60, 53},
+	{1, 54, 32, 64},
+	{33, 54, 60, 64}, -- includes the blocked passage at (41,58)-(41,59)
 }
 
 local creatureSearchRectangles = {
@@ -653,6 +714,8 @@ local creatureSearchRectangles = {
 function HoennTransportQuest:new()
 	local o = Quest.new(HoennTransportQuest, name, description, level, nil)
 	o.state = loadState()
+	-- A prior session's response wait must not prevent one fresh interaction.
+	o.state.keyAttemptAt = 0
 	if o.state.centerIndex < 1 or o.state.centerIndex > #centers then o.state.centerIndex = 1 end
 	if o.state.currentCenter < 1 or o.state.currentCenter > #centers then o.state.currentCenter = 1 end
 	if o.state.lastCenter < 1 or o.state.lastCenter > #centers then o.state.lastCenter = 1 end
@@ -775,6 +838,405 @@ function HoennTransportQuest:findActiveBattler(patterns)
 	return best
 end
 
+local newMauvilleGruntPatterns = {"aqua grunt", "magma grunt"}
+local newMauvilleSouthGrunt = {x = 21, y = 55}
+-- Do not use the two gate cells as a movement destination.  They are the
+-- scripted passage itself; asking moveToRectangle(21, 40, 22, 40) can make
+-- the pathfinder repeatedly target the barrier instead of crossing it.
+local newMauvilleSouthExit = {x = 21, y = 39}
+local newMauvilleSouthGruntKey = cellKey(
+	newMauvilleSouthGrunt.x,
+	newMauvilleSouthGrunt.y
+)
+-- The remote-control interaction is the fixed active object at (7,45).  Do
+-- not scan New Mauville's type-11 discoverable items here: that list contains
+-- optional pickups such as Rare Candy and makes the quest wander after a wild
+-- battle interrupts the actual story objective.
+local newMauvilleRemoteControl = {x = 7, y = 45}
+local newMauvilleRemoteControlKey = cellKey(
+	newMauvilleRemoteControl.x,
+	newMauvilleRemoteControl.y
+)
+-- (7,45) is the interactive object itself and is not a walkable destination.
+-- Use the adjacent walkable cell when the current NPC snapshot is delayed.
+local newMauvilleRemoteControlApproach = {x = 6, y = 45}
+
+function HoennTransportQuest:waitForRemoteProgress(reason)
+	local now = os.time()
+	if self.remoteWaitStarted == nil then
+		self.remoteWaitStarted = now
+	end
+	-- A successful wait action is not evidence of progress. Never renew this
+	-- deadline every tick: that hid failed paths as an endless intentional wait.
+	if now - self.remoteWaitStarted >= 8 then
+		return fatal("New Mauville remote objective blocked at (" .. getPlayerX()
+			.. "," .. getPlayerY() .. "): " .. reason
+			.. ". Gate/key state was not changed; no item search or relog attempted.")
+	end
+	if type(waitForState) == "function" then
+		return waitForState(1000)
+	end
+	return false
+end
+
+function HoennTransportQuest:isRemoteGateOpen()
+	-- Absence from an empty/delayed NPC list is NOT proof of completion.
+	-- Require a recognizable live quest NPC and two consistent observations.
+	local anchor, blocked = false, false
+	for _, npc in ipairs(type(getNpcData) == "function" and getNpcData() or {}) do
+		local x, y = tonumber(npc.x), tonumber(npc.y)
+		if y == 40 and (x == 21 or x == 22) then blocked = true end
+		if x == 21 and y == 55 and npcMatches(npc, "aqua grunt") then
+			anchor = true
+		end
+	end
+	if not anchor or blocked then
+		self.remoteGateObservedAt = nil
+		return false
+	end
+	if self.remoteGateObservedAt == nil then
+		self.remoteGateObservedAt = os.time()
+		return false
+	end
+	return os.time() - self.remoteGateObservedAt >= 1
+end
+
+function HoennTransportQuest:handleRemoteControl()
+	local state = self.state
+	if not state.keyFound and self:isRemoteGateOpen() then
+		state.keyFound = true
+		state.keyAttempt = ""
+		state.keyAttemptAt = 0
+		self.remoteWaitStarted = nil
+		saveState(state)
+		self:debug("quest", "Remote barrier already open; resuming north of the gate.", false)
+	end
+
+	if state.keyFound then
+		-- A queued path may be interrupted by a wild battle. Complete crossing
+		-- only on arrival, not merely when moveToCell returns true.
+		local x, y = getPlayerX(), getPlayerY()
+		if x >= 16 and x <= 32 and y >= 16 and y <= 39 then
+			state.southPassageStep = "done"
+			state.southPassageComplete = true
+			state.pendingBattle = false
+			state.phase = "clear_remaining_trainers"
+			self.remoteWaitStarted = nil
+			saveState(state)
+			return false
+		end
+		if moveToCell(newMauvilleSouthExit.x, newMauvilleSouthExit.y) then
+			self.remoteWaitStarted = nil
+			return true
+		end
+		return self:waitForRemoteProgress("cannot reach the north side of the open gate (21,39)")
+	end
+
+	-- Discard obsolete optional-pickup attempts, but retain the actual story
+	-- target across interrupted movement. No type-11 discovery is performed.
+	if state.keyAttempt ~= "" and state.keyAttempt ~= newMauvilleRemoteControlKey then
+		state.keyAttempt = ""
+		state.keyAttemptAt = 0
+		saveState(state)
+	end
+	local x, y = getPlayerX(), getPlayerY()
+	local adjacent = math.abs(x - newMauvilleRemoteControl.x)
+		+ math.abs(y - newMauvilleRemoteControl.y) <= 1
+	if isNpcOnCell(newMauvilleRemoteControl.x, newMauvilleRemoteControl.y) then
+		-- The response timer starts beside the object, not when a path is queued.
+		if adjacent and state.keyAttemptAt > 0 then
+			self.remoteWaitStarted = self.remoteWaitStarted or state.keyAttemptAt
+			return self:waitForRemoteProgress("remote interaction returned no gate-opening response")
+		end
+		if talkToNpcOnCell(newMauvilleRemoteControl.x, newMauvilleRemoteControl.y) then
+			state.keyAttempt = newMauvilleRemoteControlKey
+			state.keyAttemptAt = adjacent and os.time() or 0
+			self.remoteWaitStarted = nil
+			saveState(state)
+			return true
+		end
+		return self:waitForRemoteProgress("remote object is visible but unreachable")
+	end
+
+	-- A consumed remote disappears. Check the live gate above before returning
+	-- to its former position. Never wait indefinitely for it to respawn.
+	if x ~= newMauvilleRemoteControlApproach.x or y ~= newMauvilleRemoteControlApproach.y then
+		if moveToCell(newMauvilleRemoteControlApproach.x, newMauvilleRemoteControlApproach.y) then
+			self.remoteWaitStarted = nil
+			return true
+		end
+	end
+	return self:waitForRemoteProgress("remote is absent and the gate cannot yet be confirmed open")
+end
+
+function HoennTransportQuest:isGruntAttempted(npc)
+	if npc == nil then
+		return false
+	end
+	local key = cellKey(npc.x, npc.y)
+	return self.state.gruntAttempts ~= nil
+		and self.state.gruntAttempts[key] == true
+end
+
+function HoennTransportQuest:findNewMauvilleGrunt()
+	-- Prefer the normal active-battler API when the server exposes the grunt
+	-- as a battle NPC.  Some New Mauville event grunts are delivered as
+	-- ordinary scripted NPCs, however, so they are not returned by
+	-- getActiveBattlers() even though talking to them starts the battle.
+	local active = self:findActiveBattler(newMauvilleGruntPatterns)
+	if active ~= nil and not self:isGruntAttempted(active) then
+		return active
+	end
+
+	if type(getNpcData) ~= "function" then
+		return nil
+	end
+
+	local best = nil
+	local bestDistance = nil
+	local px = type(getPlayerX) == "function" and getPlayerX() or 0
+	local py = type(getPlayerY) == "function" and getPlayerY() or 0
+	for _, npc in ipairs(getNpcData() or {}) do
+		if npcMatches(npc, newMauvilleGruntPatterns) then
+			local x = tonumber(npc.x)
+			local y = tonumber(npc.y)
+			local candidate = {x = x, y = y, name = npc.name}
+			if x ~= nil and y ~= nil and not self:isGruntAttempted(candidate) then
+				local distance = math.abs(px - x) + math.abs(py - y)
+				if best == nil or distance < bestDistance then
+					best = candidate
+					bestDistance = distance
+				end
+			end
+		end
+	end
+	return best
+end
+
+function HoennTransportQuest:findNewMauvilleGruntAtCell(x, y)
+	local targetX = tonumber(x)
+	local targetY = tonumber(y)
+	if targetX == nil or targetY == nil then
+		return nil
+	end
+
+	-- Check the battle list first when this scripted grunt is exposed as an
+	-- active battler.  New Mauville can also expose the same NPC as a normal
+	-- scripted NPC, so fall back to getNpcData below.
+	if type(getActiveBattlers) == "function" then
+		for trainer, position in pairs(getActiveBattlers() or {}) do
+			local candidateX = tonumber(position.x)
+			local candidateY = tonumber(position.y)
+			if candidateX == targetX and candidateY == targetY
+				and npcMatches({name = trainer}, newMauvilleGruntPatterns)
+			then
+				local candidate = {name = trainer, x = targetX, y = targetY}
+				if not self:isGruntAttempted(candidate) then
+					return candidate
+				end
+			end
+		end
+	end
+
+	if type(getNpcData) == "function" then
+		for _, npc in ipairs(getNpcData() or {}) do
+			local candidateX = tonumber(npc.x)
+			local candidateY = tonumber(npc.y)
+			if candidateX == targetX and candidateY == targetY
+				and npcMatches(npc, newMauvilleGruntPatterns)
+			then
+				local candidate = {name = npc.name, x = targetX, y = targetY}
+				if not self:isGruntAttempted(candidate) then
+					return candidate
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+function HoennTransportQuest:challengeNewMauvilleGrunt(preferredTrainer)
+	local trainer = preferredTrainer or self:findNewMauvilleGrunt()
+	if trainer == nil or not self:talkToFoundNpc(trainer) then
+		return false
+	end
+
+	self.state.gruntAttempts[cellKey(trainer.x, trainer.y)] = true
+	if tonumber(trainer.x) == newMauvilleSouthGrunt.x
+		and tonumber(trainer.y) == newMauvilleSouthGrunt.y
+	then
+		-- Keep movement away from the gate until the NPC battle has ended and
+		-- the server has published the opened passage.
+		self.state.southPassageStep = "await_grunt"
+		self.state.southPassageAttemptedAt = os.time()
+	end
+	self.state.pendingBattle = true
+	saveState(self.state)
+	return true
+end
+
+function HoennTransportQuest:challengeNewMauvilleSouthGrunt()
+	local trainer = self:findNewMauvilleGruntAtCell(
+		newMauvilleSouthGrunt.x,
+		newMauvilleSouthGrunt.y
+	)
+	if trainer == nil
+		and type(isNpcOnCell) == "function"
+		and isNpcOnCell(newMauvilleSouthGrunt.x, newMauvilleSouthGrunt.y)
+	then
+		-- Type 157 is the map's Aqua Grunt at this fixed cell.  Use the
+		-- coordinate directly because it is a scripted NPC, not an active
+		-- battler in getActiveBattlers().
+		trainer = {
+			name = "Aqua Grunt",
+			x = newMauvilleSouthGrunt.x,
+			y = newMauvilleSouthGrunt.y,
+		}
+	end
+	if trainer == nil then
+		return false
+	end
+	return self:challengeNewMauvilleGrunt(trainer)
+end
+
+function HoennTransportQuest:handleNewMauvilleSouthPassage()
+	local state = self.state
+	local passageStep = tostring(state.southPassageStep or "find_grunt")
+
+	-- Older state files could record the passage as done after targeting the
+	-- gate rectangle, without ever completing the fixed-cell interaction.
+	-- Replay only that one-time sequence once, then mark it explicitly after
+	-- the player reaches the upper side of the passage.
+	if passageStep == "done" and not state.southPassageComplete then
+		state.southPassageStep = "find_grunt"
+		state.gruntAttempts[newMauvilleSouthGruntKey] = nil
+		state.pendingBattle = false
+		saveState(state)
+		passageStep = "find_grunt"
+	end
+
+	-- This is a one-time lower-to-upper passage sequence.  Once it is done,
+	-- return nil so the normal New Mauville trainer/key flow can continue.
+	if passageStep == "done" then
+		return nil
+	end
+
+	if passageStep == "find_grunt" then
+		if self:challengeNewMauvilleSouthGrunt() then
+			return true
+		end
+
+		-- An interrupted/reconnected account may already have attempted this
+		-- cell.  Do not challenge another grunt before opening the passage.
+		if state.gruntAttempts ~= nil
+			and state.gruntAttempts[newMauvilleSouthGruntKey]
+		then
+			state.southPassageStep = "wait_for_gate"
+			saveState(state)
+			passageStep = "wait_for_gate"
+		else
+			-- Always perform the interaction at the fixed cell before trying
+			-- the passage.  Bot.TalkToNpc will path to an adjacent cell; moving
+			-- to the NPC's blocked tile first is not required and can make the
+			-- client walk toward the gate instead.
+			if self:challengeNewMauvilleSouthGrunt() then
+				return true
+			end
+			-- The map/NPC snapshot can arrive one tick after a transition.
+			-- Wait in place instead of issuing a gate movement request.
+			if type(waitForState) == "function" then
+				return waitForState(1000)
+			end
+			return false
+		end
+	end
+
+	if passageStep == "await_grunt" then
+		-- The battle callback advances this to wait_for_gate.  Never issue a
+		-- movement request while the required grunt battle is still pending.
+		if state.pendingBattle then
+			-- A stale state file or a reconnect can leave pendingBattle set even
+			-- though no battle is currently active.  Retry the fixed NPC after a
+			-- short bounded interval instead of waiting forever.
+			local attemptedAt = tonumber(state.southPassageAttemptedAt) or 0
+			if attemptedAt == 0 or os.time() - attemptedAt >= 8 then
+				state.pendingBattle = false
+				state.gruntAttempts[newMauvilleSouthGruntKey] = nil
+				state.southPassageStep = "find_grunt"
+				state.southPassageAttemptedAt = 0
+				saveState(state)
+				if self:challengeNewMauvilleSouthGrunt() then
+					return true
+				end
+				if type(waitForState) == "function" then
+					return waitForState(1000)
+				end
+				return false
+			end
+			if type(waitForState) == "function" then
+				return waitForState(1000)
+			end
+			return true
+		end
+		state.southPassageStep = "wait_for_gate"
+		state.southPassageAttemptedAt = 0
+		saveState(state)
+		passageStep = "wait_for_gate"
+	end
+
+	if passageStep == "open_path" then
+		-- Migrate state written by the previous implementation.  That version
+		-- targeted the gate rectangle directly, which could oscillate on the
+		-- two scripted cells.
+		state.southPassageStep = "wait_for_gate"
+		saveState(state)
+		passageStep = "wait_for_gate"
+	end
+
+	if passageStep == "wait_for_gate" then
+		if type(waitForState) == "function" then
+			state.southPassageStep = "cross_gate"
+			saveState(state)
+			return waitForState(2000)
+		end
+		state.southPassageStep = "cross_gate"
+		saveState(state)
+		passageStep = "cross_gate"
+	end
+
+	if passageStep == "cross_gate" then
+		-- Aim at a safe cell north of the passage, never at (21,40) or
+		-- (22,40) themselves.  This lets the pathfinder cross the opened
+		-- gate once and prevents the old gate-cell oscillation.
+		if moveToCell(newMauvilleSouthExit.x, newMauvilleSouthExit.y) then
+			state.southPassageStep = "go_top"
+			saveState(state)
+			return true
+		end
+		if type(waitForState) == "function" then
+			return waitForState(1500)
+		end
+		return false
+	end
+
+	if state.southPassageStep == "go_top" then
+		local result = moveToRectangle(16, 16, 32, 35)
+		if result then
+			state.southPassageStep = "done"
+			state.southPassageComplete = true
+			saveState(state)
+		end
+		return result
+	end
+
+	-- Unknown persisted values should not strand the quest.  Reset the
+	-- one-time passage marker and let the regular quest logic continue.
+	state.southPassageStep = "done"
+	saveState(state)
+	return nil
+end
+
 function HoennTransportQuest:talkToFoundNpc(npc)
 	if npc == nil then
 		return false
@@ -852,7 +1314,7 @@ function HoennTransportQuest:followRoute(routeName)
 			-- which makes BotClient stop with "No action executed".
 			local previousStep = route[routeStepIndex - 1]
 			self:debug("quest", "Retrying Hoenn transport map transition.", false)
-			return moveToCell(previousStep.x, previousStep.y)
+			return moveToRouteStep(previousStep)
 		else
 			-- Do not leave the bot idle merely because the persisted wait flag
 			-- survived a reconnect.  The forward resynchronization below can
@@ -888,7 +1350,7 @@ function HoennTransportQuest:followRoute(routeName)
 
 	self:prepareDive(routeStepIndex)
 	self:debug("quest", "Following Hoenn transport route.", false)
-	if moveToCell(routeStep.x, routeStep.y) then
+	if moveToRouteStep(routeStep) then
 		self.state.routeStep = routeStepIndex + 1
 		self.state.routeWaiting = true
 		saveState(self.state)
@@ -931,62 +1393,44 @@ end
 function HoennTransportQuest:handleNewMauvilleTrainerPhase()
 	local state = self.state
 
+	if state.phase == "clear_trainers"
+		or state.phase == "clear_remaining_trainers"
+	then
+		local southPassageResult = self:handleNewMauvilleSouthPassage()
+		if southPassageResult ~= nil then
+			return southPassageResult
+		end
+	end
+
 	if state.phase == "clear_trainers" then
+		-- The fixed south-grunt interaction is the entry requirement for the
+		-- upper New Mauville route.  Once that passage has completed, do not
+		-- restart the broad lower-map grunt sweep after a wild battle; continue
+		-- with the existing remote-control objective instead.
+		if state.southPassageComplete then
+			state.phase = "find_remote_key"
+			state.pendingBattle = false
+			saveState(state)
+			return false
+		end
 		if state.gruntsDefeated >= 2 then
 			state.phase = "find_remote_key"
 			saveState(state)
 			return false
 		end
-		local trainer = self:findActiveBattler({"aqua grunt", "magma grunt", " grunt"})
-		if trainer ~= nil then
-			if self:talkToFoundNpc(trainer) then
-				state.pendingBattle = true
-				saveState(state)
-				return true
-			end
+		if self:challengeNewMauvilleGrunt() then
+			return true
 		end
 		return self:searchNewMauville(newMauvilleSearchRectangles, "newMauvilleSweep")
 	end
 
 	if state.phase == "find_remote_key" then
-		if state.keyFound then
-			state.phase = "clear_remaining_trainers"
-			saveState(state)
-			return false
-		end
-
-		if type(getDiscoverableItems) == "function" then
-			for _, item in ipairs(getDiscoverableItems() or {}) do
-				local x = tonumber(item.x)
-				local y = tonumber(item.y)
-				local key = cellKey(x, y)
-				if x ~= nil and y ~= nil and state.keyAttempt ~= key and isNpcOnCell(x, y) then
-					if talkToNpcOnCell(x, y) then
-						state.keyAttempt = key
-						saveState(state)
-						return true
-					end
-				end
-			end
-		end
-
-		local namedKey = self:findNpc({"remote", "cardboard", "control key", "key"})
-		if namedKey ~= nil and self:talkToFoundNpc(namedKey) then
-			state.keyAttempt = cellKey(namedKey.x, namedKey.y)
-			saveState(state)
-			return true
-		end
-		return self:searchNewMauville(newMauvilleSearchRectangles, "keySweep")
+		return self:handleRemoteControl()
 	end
 
 	if state.phase == "clear_remaining_trainers" then
-		local trainer = self:findActiveBattler({"aqua grunt", "magma grunt", " grunt"})
-		if trainer ~= nil then
-			if self:talkToFoundNpc(trainer) then
-				state.pendingBattle = true
-				saveState(state)
-				return true
-			end
+		if self:challengeNewMauvilleGrunt() then
+			return true
 		end
 		state.phase = "fight_admins"
 		saveState(state)
@@ -1294,7 +1738,29 @@ function HoennTransportQuest:handleCurrentMap()
 	end
 
 	if map == normalizedMapName("New Mauville Entrance") then
-		if state.phase == "to_new_mauville" or state.phase == "to_mauville_pc"
+		if state.phase == "to_new_mauville" then
+			-- Shelly blocks the New Mauville entrance until the scripted
+			-- conversation at this fixed cell has been triggered.
+			if not state.entranceShellyTalked and isNpcOnCell(12, 7) then
+				if talkToNpcOnCell(12, 7) then
+					state.entranceShellyTalked = true
+					saveState(state)
+					return true
+				end
+			end
+			-- The entrance scene leaves Wattson at (13,7).  He must be
+			-- acknowledged before the New Mauville map link becomes usable.
+			if not state.entranceWattsonTalked and isNpcOnCell(13, 7) then
+				if talkToNpcOnCell(13, 7) then
+					state.entranceWattsonTalked = true
+					saveState(state)
+					return true
+				end
+			end
+			return self:followRoute(state.routeName)
+		end
+
+		if state.phase == "to_mauville_pc"
 			or state.phase == "handoff_to_lilycove"
 		then
 			return self:followRoute(state.routeName)
@@ -1336,12 +1802,40 @@ function HoennTransportQuest:dialog(message)
 	Quest.dialog(self, message)
 	local state = self.state
 
-	if state.phase == "find_remote_key"
-		and state.keyAttempt ~= ""
-		and containsAny(message, {"remote", "control", "cardboard", "key"})
+	if state.southPassageStep == "await_grunt"
+		and containsAny(message, {
+			"hid the remote-control key",
+			"hid the remote control key",
+			"hid the remote-control keys",
+			"hid the remote control keys",
+		})
 	then
+		-- The type-157 NPC can answer with the remote-control dialogue without
+		-- opening a normal battle.  Treat that response as a successful fixed
+		-- cell interaction so the quest does not talk to the same NPC forever.
+		state.pendingBattle = false
+		state.southPassageStep = "wait_for_gate"
+		state.southPassageAttemptedAt = 0
+		saveState(state)
+	elseif containsAny(message, {
+		"found the hidden remote control",
+		"found the hidden remote-control",
+		"deactivated the nearby electro-barrier",
+		"deactivated the nearby electro barrier",
+	})
+	then
+		-- This response can arrive after a reconnect or after the south-grunt
+		-- phase has already advanced.  Record it globally so a valid remote-key
+		-- interaction is never lost just because the phase changed one tick late.
 		state.keyFound = true
-		state.phase = "clear_remaining_trainers"
+		state.keyAttempt = ""
+		state.keyAttemptAt = 0
+		self.remoteWaitStarted = nil
+		if state.phase == "find_remote_key"
+			or state.phase == "clear_trainers"
+		then
+			state.phase = "find_remote_key"
+		end
 		saveState(state)
 	elseif state.phase == "install_programs"
 		and state.stationAttempted
@@ -1360,8 +1854,19 @@ end
 function HoennTransportQuest:battleMessage(message)
 	Quest.battleMessage(self, message)
 	local state = self.state
+	-- Battle time is not a failed overworld wait; keep the objective itself.
+	self.remoteWaitStarted = nil
+	self.remoteGateObservedAt = nil
+	if state.phase == "find_remote_key" then state.keyAttemptAt = 0 end
 	if state.pendingBattle and containsAny(message, {"won the battle", "defeated"}) then
 		state.pendingBattle = false
+		if state.southPassageStep == "await_grunt"
+			and state.gruntAttempts ~= nil
+			and state.gruntAttempts[newMauvilleSouthGruntKey]
+		then
+			state.southPassageStep = "wait_for_gate"
+			state.southPassageAttemptedAt = 0
+		end
 		if state.phase == "clear_trainers" then
 			state.gruntsDefeated = state.gruntsDefeated + 1
 		elseif state.phase == "clear_remaining_trainers" then
@@ -1404,7 +1909,7 @@ end
 registerRouteMaps(mauvilleToNew)
 registerRouteMaps({
 	step("New Mauville", 47, 53),
-	step("New Mauville Entrance", 12, 4),
+	step("New Mauville Entrance", 12, 4, 13, 4),
 	step("Transmat Station", 9, 10),
 })
 for _, center in ipairs(centers) do
