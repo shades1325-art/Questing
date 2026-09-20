@@ -52,27 +52,30 @@ end
 function Quest:isPersistentCompletionValid()
 	return true
 end
-function Quest:debug(tag, message)
+function Quest:debug(tag, message, allowRelog)
     local fullMsg = tostring(tag) .. ": " .. tostring(message)
     local now = os.time()
     local isNewMessage = self.lastDebugMessage ~= fullMsg
+    local shouldLog = isNewMessage
+        or self.lastDebugAt == nil
+        or os.difftime(now, self.lastDebugAt) >= DEBUG_REPEAT_INTERVAL_SECONDS
+
     if isNewMessage then
-        self.repeatCount = 1
+        self.repeatCount = allowRelog == false and 0 or 1
         self.lastDebugMessage = fullMsg
-    else
+    elseif shouldLog and allowRelog ~= false then
+        -- Count emitted repeats, not every onBattleAction/onPathAction tick.
+        -- A throttled call is expected polling, not debug spam.
         self.repeatCount = self.repeatCount + 1
     end
 
-    if isNewMessage
-        or self.lastDebugAt == nil
-        or os.difftime(now, self.lastDebugAt) >= DEBUG_REPEAT_INTERVAL_SECONDS
-    then
+    if shouldLog then
         self.lastDebugAt = now
         sys.debug(tag, message)
     end
 
     -- nếu cùng message lặp >= 6 lần thì relog
-    if self.repeatCount >= 6 then
+    if allowRelog ~= false and self.repeatCount >= 6 then
         self.repeatCount = 0       --  reset counter
         self.lastDebugMessage = "" --  xóa để không dính lại ngay
         return relog(15, "Relogging (debug spam).")
@@ -1087,7 +1090,10 @@ function Quest:battle()
 			self.heroHealRequested = true
 			return relog(HERO_RECOVERY_RELOG_DELAY_SECONDS, "Relogging: wild battle cannot be escaped.")
 		end
-		self:debug("fighting team", "Rainbow Badge complete: running from wild battle.")
+		-- Wild-battle polling is expected while run() is pending.  Let the
+		-- run/recovery action own failure handling; do not treat this as a
+		-- path-debug stall and relog after several battle ticks.
+		self:debug("fighting team", "Rainbow Badge complete: running from wild battle.", false)
 		return self:runFromWildBattleOrRecover()
 	end
 
